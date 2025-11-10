@@ -1,15 +1,33 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
 
-export default async function Home() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+export default function Home() {
+  return (
+    <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12">
+      <div className="max-w-xl w-full bg-white rounded-2xl shadow-lg p-10 text-center">
+        <h1 className="text-3xl font-bold text-gray-900">
+          <span className="text-red-600">the</span>
+          <span className="text-black">Stocktaking</span>
+          <span className="text-red-600"> Red</span>
+        </h1>
+        <p className="mt-3 text-base text-gray-600">
+          Depo sayım ve yönetim sistemine hoş geldiniz.
+        </p>
 
-  if (user) {
-    redirect('/dashboard')
-  } else {
-    redirect('/login')
-  }
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Link
+            href="/signup"
+            className="inline-flex items-center justify-center rounded-lg border border-red-600 px-4 py-3 text-base font-semibold text-red-600 hover:bg-red-50 transition"
+          >
+            Firma Kaydı Oluştur
+          </Link>
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center rounded-lg border border-transparent px-4 py-3 text-base font-semibold text-white bg-red-600 hover:bg-red-700 transition"
+          >
+            Giriş Yap
+          </Link>
+        </div>
+      </div>
+    </main>
+  )
 }

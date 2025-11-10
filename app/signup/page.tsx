@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -13,13 +13,8 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [mounted, setMounted] = useState(false)
   const router = useRouter()
   const supabase = createClient()
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -52,60 +47,47 @@ export default function SignupPage() {
     }
 
     try {
-      // 1. Create auth user
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          companyName: companyName.trim(),
+          fullName: fullName.trim(),
+          email: email.trim().toLowerCase(),
+          password,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        setError(result.error || 'Kayıt işlemi başarısız oldu')
+        setLoading(false)
+        return
+      }
+
+      // Successful signup, sign in the user
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: {
-          data: {
-            full_name: fullName,
-            company_name: companyName,
-          },
-        },
       })
 
-      if (signUpError) throw signUpError
-      if (!authData.user) throw new Error('Kullanıcı oluşturulamadı')
+      if (signInError) {
+        setError(`Hesap oluşturuldu, ancak giriş yapılamadı: ${signInError.message}`)
+        setLoading(false)
+        return
+      }
 
-      // 2. Create company
-      const { data: company, error: companyError } = await supabase
-        .from('companies')
-        .insert({
-          name: companyName.trim(),
-        })
-        .select()
-        .single()
-
-      if (companyError) throw companyError
-      if (!company) throw new Error('Firma oluşturulamadı')
-
-      // 3. Create user record
-      const { error: userError } = await supabase.from('users').insert({
-        id: authData.user.id,
-        company_id: company.id,
-        full_name: fullName.trim(),
-        email: email,
-        role: 'admin', // First user is admin
-      })
-
-      if (userError) throw userError
-
-      // Success - redirect to dashboard
       router.push('/dashboard')
       router.refresh()
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Signup error:', err)
-      setError(err.message || 'Kayıt işlemi başarısız oldu')
+      const message = err instanceof Error ? err.message : 'Kayıt işlemi başarısız oldu'
+      setError(message)
       setLoading(false)
     }
-  }
-
-  if (!mounted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-600">Yükleniyor...</div>
-      </div>
-    )
   }
 
   return (
