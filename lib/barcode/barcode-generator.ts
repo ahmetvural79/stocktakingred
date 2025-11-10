@@ -1,5 +1,16 @@
-import bwipjs from 'bwip-js'
-import QRCode from 'qrcode'
+const isBrowser = typeof window !== 'undefined'
+const loadBwipJs = async () => {
+  if (!isBrowser) {
+    throw new Error('Barcode generation is only available on the client.')
+  }
+  const module = await import('bwip-js')
+  return module.default
+}
+
+const loadQRCode = async () => {
+  const module = await import('qrcode')
+  return module.default
+}
 
 /**
  * Generate barcode image data URL
@@ -8,6 +19,8 @@ export async function generateBarcode(
   value: string,
   type: 'code128' | 'ean13' | 'code39' = 'code128'
 ): Promise<string> {
+  const bwipjs = await loadBwipJs()
+
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas')
     bwipjs.toCanvas(canvas, {
@@ -32,6 +45,7 @@ export async function generateBarcode(
  */
 export async function generateQRCode(value: string): Promise<string> {
   try {
+    const QRCode = await loadQRCode()
     const dataUrl = await QRCode.toDataURL(value, {
       width: 300,
       margin: 2,

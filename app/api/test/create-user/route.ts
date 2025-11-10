@@ -1,16 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
-/**
- * Test kullanıcısı oluşturma endpoint'i
- * 
- * Kullanım:
- * POST /api/test/create-user
- * Body: { email: "test@example.com", password: "password123", fullName: "Test User", companyName: "Test Firma A" }
- */
+interface CreateUserBody {
+  email: string
+  password: string
+  fullName?: string
+  companyName?: string
+}
+
+const DEFAULT_COMPANY_NAME = 'Test Firma A'
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    const body = (await request.json()) as CreateUserBody
     const { email, password, fullName, companyName } = body
 
     if (!email || !password) {
@@ -20,132 +22,128 @@ export async function POST(request: Request) {
       )
     }
 
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+
+    if (!serviceRoleKey || !supabaseUrl) {
+      return NextResponse.json(
+        { error: 'Supabase servis ortam değişkenleri tanımlı değil' },
+        { status: 500 }
+      )
+    }
+
     const supabase = await createClient()
 
-    // 1. Kullanıcı oluştur (Supabase Auth)
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // Email'i otomatik confirm et
+    const adminHeaders = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${serviceRoleKey}`,
+      apikey: serviceRoleKey,
+    }
+
+    let userId: string | null = null
+    let createdNewUser = false
+
+    // 1. Auth kullanıcı oluştur
+    const createResponse = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        email,
+        password,
+        email_confirm: true,
+      }),
     })
 
-    if (authError) {
-      // Eğer kullanıcı zaten varsa, onu al
-      const { data: existingUser } = await supabase.auth.admin.getUserByEmail(email)
-      if (existingUser?.user) {
-        // Kullanıcı zaten var, devam et
-        const userId = existingUser.user.id
-        
-        // Firma oluştur veya bul
-        let companyId
-        if (companyName) {
-          const { data: company } = await supabase
-            .from('companies')
-            .select('id')
-            .eq('name', companyName)
-            .single()
+    if (createResponse.ok) {
+      const authData = await createResponse.json()
+      userId = authData.user?.id ?? null
+      createdNewUser = true
+    } else if (createResponse.status === 422) {
+      // Kullanıcı zaten varsa getir
+      const existingResponse = await fetch(
+        `${supabaseUrl}/auth/v1/admin/users?email=${encodeURIComponent(email)}`,
+        { headers: adminHeaders }
+      )
 
-          if (company) {
-            companyId = company.id
-          } else {
-            const { data: newCompany } = await supabase
-              .from('companies')
-              .insert({ name: companyName })
-              .select()
-              .single()
-            companyId = newCompany?.id
-          }
-        } else {
-          // Varsayılan test firması
-          const { data: defaultCompany } = await supabase
-            .from('companies')
-            .select('id')
-            .eq('name', 'Test Firma A')
-            .single()
-          companyId = defaultCompany?.id || '00000000-0000-0000-0000-000000000001'
-        }
+      if (existingResponse.ok) {
+        const existingData = await existingResponse.json()
+        const existingUser =
+          Array.isArray(existingData?.users) && existingData.users.length > 0
+            ? existingData.users[0]
+            : existingData?.user
 
-        // Users tablosuna ekle
-        await supabase.from('users').upsert({
-          id: userId,
-          company_id: companyId,
-          full_name: fullName || 'Test User',
-          email: email,
-          role: 'admin',
-        })
-
-        return NextResponse.json({
-          success: true,
-          message: 'Kullanıcı zaten mevcut, bilgileri güncellendi',
-          user: {
-            email,
-            userId,
-            companyId,
-          },
-        })
+        userId = existingUser?.id ?? null
       }
-      
+
+      if (!userId) {
+        return NextResponse.json(
+          { error: 'Kullanıcı zaten var ancak bilgilerine erişilemedi.' },
+          { status: 400 }
+        )
+      }
+    } else {
+      const errorText = await createResponse.text()
       return NextResponse.json(
-        { error: `Auth hatası: ${authError.message}` },
+        { error: `Auth hatası: ${errorText}` },
         { status: 400 }
       )
     }
 
-    if (!authData.user) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Kullanıcı oluşturulamadı' },
         { status: 500 }
       )
     }
 
-    const userId = authData.user.id
-
     // 2. Firma oluştur veya bul
-    let companyId
-    if (companyName) {
-      const { data: company } = await supabase
-        .from('companies')
-        .select('id')
-        .eq('name', companyName)
-        .single()
+    const targetCompanyName = companyName?.trim() || DEFAULT_COMPANY_NAME
 
-      if (company) {
-        companyId = company.id
-      } else {
-        const { data: newCompany } = await supabase
-          .from('companies')
-          .insert({ name: companyName })
-          .select()
-          .single()
-        companyId = newCompany?.id
-      }
-    } else {
-      // Varsayılan test firması
-      const { data: defaultCompany } = await supabase
-        .from('companies')
-        .select('id')
-        .eq('name', 'Test Firma A')
-        .single()
-      
-      if (!defaultCompany) {
-        // Test firması yoksa oluştur
-        const { data: newCompany } = await supabase
-          .from('companies')
-          .insert({ name: 'Test Firma A' })
-          .select()
-          .single()
-        companyId = newCompany?.id
-      } else {
-        companyId = defaultCompany.id
-      }
+    const { data: existingCompany, error: companyFetchError } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('name', targetCompanyName)
+      .single()
+
+    if (companyFetchError && companyFetchError.code !== 'PGRST116') {
+      return NextResponse.json(
+        { error: `Firma bilgisi alınamadı: ${companyFetchError.message}` },
+        { status: 500 }
+      )
     }
 
-    // 3. Users tablosuna ekle
+    let companyId = existingCompany?.id
+
+    if (!companyId) {
+      const { data: newCompany, error: createCompanyError } = await supabase
+        .from('companies')
+        .insert({ name: targetCompanyName })
+        .select()
+        .single()
+
+      if (createCompanyError) {
+        return NextResponse.json(
+          { error: `Firma oluşturulamadı: ${createCompanyError.message}` },
+          { status: 500 }
+        )
+      }
+
+      companyId = newCompany?.id
+    }
+
+    if (!companyId) {
+      return NextResponse.json(
+        { error: 'Firma bilgisi oluşturulamadı' },
+        { status: 500 }
+      )
+    }
+
+    // 3. Users tablosuna ekle/güncelle
     const { error: userError } = await supabase.from('users').upsert({
       id: userId,
       company_id: companyId,
-      full_name: fullName || 'Test User',
-      email: email,
+      full_name: fullName?.trim() || 'Test User',
+      email,
       role: 'admin',
     })
 
@@ -158,7 +156,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Test kullanıcısı başarıyla oluşturuldu',
+      message: createdNewUser
+        ? 'Test kullanıcısı başarıyla oluşturuldu'
+        : 'Kullanıcı bilgileri güncellendi',
       user: {
         email,
         password,
@@ -166,12 +166,9 @@ export async function POST(request: Request) {
         companyId,
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Create user error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Kullanıcı oluşturma hatası' },
-      { status: 500 }
-    )
+    const message = error instanceof Error ? error.message : 'Kullanıcı oluşturma hatası'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
-

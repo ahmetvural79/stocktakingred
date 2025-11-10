@@ -1,6 +1,8 @@
-import { Document, Page, Text, View, StyleSheet, PDFDownloadLink } from '@react-pdf/renderer'
+import React from 'react'
+import type { ReactElement } from 'react'
+import type { DocumentProps } from '@react-pdf/renderer'
 
-interface CountItem {
+export interface CountItem {
   product_name: string | null
   quantity: number
   quantity_unit: string
@@ -15,7 +17,7 @@ interface CountItem {
   } | null
 }
 
-interface MatchResult {
+export interface MatchResult {
   count_items: CountItem
   erp_items: {
     product_code: string
@@ -25,61 +27,72 @@ interface MatchResult {
   difference: number
 }
 
-const styles = StyleSheet.create({
-  page: {
-    padding: 30,
-    fontSize: 10,
-  },
-  title: {
-    fontSize: 20,
-    marginBottom: 20,
-    fontWeight: 'bold',
-  },
-  table: {
-    display: 'flex',
-    width: 'auto',
-    borderStyle: 'solid',
-    borderWidth: 1,
-    borderRightWidth: 0,
-    borderBottomWidth: 0,
-  },
-  tableRow: {
-    margin: 'auto',
-    flexDirection: 'row',
-  },
-  tableColHeader: {
-    width: '20%',
-    borderStyle: 'solid',
-    borderWidth: 1,
-    borderLeftWidth: 0,
-    borderTopWidth: 0,
-    backgroundColor: '#f0f0f0',
-    padding: 5,
-  },
-  tableCol: {
-    width: '20%',
-    borderStyle: 'solid',
-    borderWidth: 1,
-    borderLeftWidth: 0,
-    borderTopWidth: 0,
-    padding: 5,
-  },
-  tableCellHeader: {
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  tableCell: {
-    fontSize: 9,
-  },
-})
+type ReactPDFModule = typeof import('@react-pdf/renderer')
 
-export function generateCountReportPDF(matches: MatchResult[], title: string = 'Sayım Raporu') {
-  const CountReport = () => (
+async function loadReactPDF(): Promise<ReactPDFModule> {
+  const reactPDF = await import('@react-pdf/renderer')
+  return reactPDF
+}
+
+export async function generateCountReportPDF(
+  matches: MatchResult[],
+  reportTitle: string = 'Sayım Raporu'
+): Promise<ReactElement<DocumentProps>> {
+  const { Document, Page, Text, View, StyleSheet } = await loadReactPDF()
+
+  const styles = StyleSheet.create({
+    page: {
+      padding: 30,
+      fontSize: 10,
+    },
+    title: {
+      fontSize: 20,
+      marginBottom: 20,
+      fontWeight: 'bold',
+    },
+    table: {
+      display: 'flex',
+      width: 'auto',
+      borderStyle: 'solid',
+      borderWidth: 1,
+      borderRightWidth: 0,
+      borderBottomWidth: 0,
+    },
+    tableRow: {
+      margin: 'auto',
+      flexDirection: 'row',
+    },
+    tableColHeader: {
+      width: '20%',
+      borderStyle: 'solid',
+      borderWidth: 1,
+      borderLeftWidth: 0,
+      borderTopWidth: 0,
+      backgroundColor: '#f0f0f0',
+      padding: 5,
+    },
+    tableCol: {
+      width: '20%',
+      borderStyle: 'solid',
+      borderWidth: 1,
+      borderLeftWidth: 0,
+      borderTopWidth: 0,
+      padding: 5,
+    },
+    tableCellHeader: {
+      fontSize: 10,
+      fontWeight: 'bold',
+    },
+    tableCell: {
+      fontSize: 9,
+    },
+  })
+
+  return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.title}>{reportTitle}</Text>
         <View style={styles.table}>
-          {/* Header */}
           <View style={styles.tableRow}>
             <View style={styles.tableColHeader}>
               <Text style={styles.tableCellHeader}>Ürün Adı</Text>
@@ -97,13 +110,10 @@ export function generateCountReportPDF(matches: MatchResult[], title: string = '
               <Text style={styles.tableCellHeader}>Fark</Text>
             </View>
           </View>
-          {/* Rows */}
           {matches.map((match, index) => (
             <View key={index} style={styles.tableRow}>
               <View style={styles.tableCol}>
-                <Text style={styles.tableCell}>
-                  {match.count_items.product_name || 'Bilinmiyor'}
-                </Text>
+                <Text style={styles.tableCell}>{match.count_items.product_name || 'Bilinmiyor'}</Text>
               </View>
               <View style={styles.tableCol}>
                 <Text style={styles.tableCell}>{match.erp_items.product_code}</Text>
@@ -133,7 +143,5 @@ export function generateCountReportPDF(matches: MatchResult[], title: string = '
       </Page>
     </Document>
   )
-
-  return CountReport
 }
 

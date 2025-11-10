@@ -149,10 +149,11 @@ export default async function DashboardPage() {
     },
   ]
 
-  const companyName =
-    !isMainAdmin && userData?.companies && typeof userData.companies === 'object' && 'name' in userData.companies
-      ? userData.companies.name
-      : undefined
+  const companyName = !isMainAdmin
+    ? (typeof userData?.companies === 'object' && userData.companies !== null
+        ? (userData.companies as { name?: string }).name
+        : undefined)
+    : undefined
 
   return (
     <DashboardLayout

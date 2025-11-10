@@ -13,16 +13,8 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Ignore service worker 404 warnings
   typescript: {
-    // !! WARN !!
-    // Dangerously allow production builds to successfully complete even if
-    // your project has type errors.
-    // !! WARN !!
     ignoreBuildErrors: false,
-  },
-  eslint: {
-    ignoreDuringBuilds: false,
   },
 };
 
