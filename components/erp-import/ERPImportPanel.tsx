@@ -205,7 +205,7 @@ export default function ERPImportPanel() {
       console.log('[ERP Import] Processing Excel data:', {
         rowCount: jsonData.length,
         firstRow: jsonData[0],
-        columns: jsonData.length > 0 ? Object.keys(jsonData[0]) : [],
+        columns: jsonData.length > 0 && jsonData[0] ? Object.keys(jsonData[0] as Record<string, unknown>) : [],
       })
 
       const erpItems = jsonData
