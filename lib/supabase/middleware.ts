@@ -2,6 +2,19 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+  
+  // Check if this is an API route - API routes should handle their own auth
+  // This check must be done FIRST, before any cookie-based auth
+  // This prevents middleware from redirecting API requests to /login
+  if (pathname.startsWith('/api/')) {
+    // API route - let it handle its own authentication
+    // API routes can use Authorization header (mobile) or cookies (web)
+    return NextResponse.next({
+      request,
+    })
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -15,7 +28,7 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
             request,
           })
@@ -45,23 +58,14 @@ export async function updateSession(request: NextRequest) {
 
   const isPublicPath = publicPaths.some((path) => {
     if (path === '/') {
-      return request.nextUrl.pathname === '/'
+      return pathname === '/'
     }
-    return request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`)
+    return pathname === path || pathname.startsWith(`${path}/`)
   })
-
-  // Check if this is an API route with Authorization header (mobile app)
-  const isApiRoute = request.nextUrl.pathname.startsWith('/api/')
-  const hasAuthHeader = request.headers.get('Authorization')?.startsWith('Bearer ')
-
-  // For API routes with Authorization header, skip cookie-based auth check
-  // The API route itself will handle token validation
-  if (isApiRoute && hasAuthHeader) {
-    return supabaseResponse
-  }
 
   if (!user && !isPublicPath) {
     // no user, potentially respond by redirecting the user to the login page
+    console.log('[middleware] No user found and not public path, redirecting to login:', pathname)
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

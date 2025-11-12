@@ -30,7 +30,8 @@ export async function createClient() {
 
 /**
  * Get user from Authorization header token (for mobile app)
- * Uses Supabase REST API to verify token
+ * Uses Supabase Admin API or REST API to verify token
+ * Alternative: Create a Supabase client with the access token
  */
 export async function getUserFromToken(accessToken: string) {
   try {
@@ -42,27 +43,36 @@ export async function getUserFromToken(accessToken: string) {
       return { user: null, error: new Error('Missing environment variables') }
     }
 
-    const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        apikey: anonKey,
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('[getUserFromToken] Token validation failed:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorText,
+    // Method 1: Use Supabase REST API /auth/v1/user endpoint
+    try {
+      const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          apikey: anonKey,
+          'Content-Type': 'application/json',
+        },
       })
-      return { user: null, error: new Error(`Token validation failed: ${response.status} ${response.statusText}`) }
+
+      if (response.ok) {
+        const user = await response.json()
+        console.log('[getUserFromToken] Token validated via /auth/v1/user, user ID:', user.id)
+        return { user, error: null }
+      } else {
+        const errorText = await response.text()
+        console.error('[getUserFromToken] /auth/v1/user failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText.substring(0, 200),
+        })
+      }
+    } catch (fetchError) {
+      console.error('[getUserFromToken] /auth/v1/user fetch error:', fetchError)
     }
 
-    const user = await response.json()
-    console.log('[getUserFromToken] Token validated successfully, user ID:', user.id)
-    return { user, error: null }
+    // If Method 1 failed, return error
+    // /auth/v1/user is the standard way to validate Supabase tokens
+    return { user: null, error: new Error('Token validation failed: Unable to validate token with Supabase') }
   } catch (error) {
     console.error('[getUserFromToken] Error validating token:', error)
     return { user: null, error: error instanceof Error ? error : new Error('Unknown error') }
