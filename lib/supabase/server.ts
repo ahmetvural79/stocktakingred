@@ -33,20 +33,40 @@ export async function createClient() {
  * Uses Supabase REST API to verify token
  */
 export async function getUserFromToken(accessToken: string) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    },
-  })
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    
+    if (!supabaseUrl || !anonKey) {
+      console.error('[getUserFromToken] Missing environment variables')
+      return { user: null, error: new Error('Missing environment variables') }
+    }
 
-  if (!response.ok) {
-    return { user: null, error: new Error('Invalid token') }
+    const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        apikey: anonKey,
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[getUserFromToken] Token validation failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      })
+      return { user: null, error: new Error(`Token validation failed: ${response.status} ${response.statusText}`) }
+    }
+
+    const user = await response.json()
+    console.log('[getUserFromToken] Token validated successfully, user ID:', user.id)
+    return { user, error: null }
+  } catch (error) {
+    console.error('[getUserFromToken] Error validating token:', error)
+    return { user: null, error: error instanceof Error ? error : new Error('Unknown error') }
   }
-
-  const user = await response.json()
-  return { user, error: null }
 }
 
 

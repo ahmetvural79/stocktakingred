@@ -50,6 +50,16 @@ export async function updateSession(request: NextRequest) {
     return request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`)
   })
 
+  // Check if this is an API route with Authorization header (mobile app)
+  const isApiRoute = request.nextUrl.pathname.startsWith('/api/')
+  const hasAuthHeader = request.headers.get('Authorization')?.startsWith('Bearer ')
+
+  // For API routes with Authorization header, skip cookie-based auth check
+  // The API route itself will handle token validation
+  if (isApiRoute && hasAuthHeader) {
+    return supabaseResponse
+  }
+
   if (!user && !isPublicPath) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone()

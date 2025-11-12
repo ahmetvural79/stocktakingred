@@ -25,22 +25,35 @@ export async function POST(request: NextRequest) {
     // Check if request has Authorization header (mobile app) or use cookies (web app)
     const authHeader = request.headers.get('Authorization')
     
+    console.log('[presigned-url] Request received:', {
+      hasAuthHeader: !!authHeader,
+      path: request.nextUrl.pathname,
+      method: request.method,
+    })
+    
     if (authHeader) {
       // Mobile app: Use Authorization header
       const accessToken = authHeader.replace('Bearer ', '')
+      console.log('[presigned-url] Validating token for mobile app, token length:', accessToken.length)
+      
       const { user: tokenUser, error: tokenError } = await getUserFromToken(accessToken)
       
       if (tokenError || !tokenUser) {
-        console.error('Token validation error:', tokenError)
+        console.error('[presigned-url] Token validation error:', {
+          error: tokenError,
+          hasUser: !!tokenUser,
+        })
         return NextResponse.json(
           { error: 'Unauthorized', details: 'Invalid token' },
           { status: 401 }
         )
       }
       
+      console.log('[presigned-url] Token validated, user ID:', tokenUser.id)
       user = tokenUser
       
       if (!user || !user.id) {
+        console.error('[presigned-url] Invalid user after token validation')
         return NextResponse.json(
           { error: 'Unauthorized', details: 'Invalid user' },
           { status: 401 }
@@ -63,15 +76,24 @@ export async function POST(request: NextRequest) {
       )
       
       if (!userResponse.ok) {
-        console.error('Failed to fetch user data:', userResponse.statusText)
+        console.error('[presigned-url] Failed to fetch user data:', {
+          status: userResponse.status,
+          statusText: userResponse.statusText,
+          userId: user.id,
+        })
         return NextResponse.json(
-          { error: 'Failed to fetch user data' },
+          { error: 'Failed to fetch user data', details: userResponse.statusText },
           { status: 500 }
         )
       }
       
       const userDataArray = await userResponse.json() as UserData[]
       userData = Array.isArray(userDataArray) ? userDataArray[0] : (userDataArray as UserData)
+      
+      console.log('[presigned-url] User data fetched:', {
+        userId: user.id,
+        companyId: userData?.company_id,
+      })
     } else {
       // Web app: Use cookies
       const supabase = await createClient()
@@ -147,11 +169,22 @@ export async function POST(request: NextRequest) {
 
     // Verify user's company matches requested company
     if (!userData || !userData.company_id || userData.company_id !== companyId) {
+      console.error('[presigned-url] Company ID mismatch:', {
+        userCompanyId: userData?.company_id,
+        requestedCompanyId: companyId,
+      })
       return NextResponse.json(
         { error: 'Forbidden', details: 'Company ID mismatch' },
         { status: 403 }
       )
     }
+
+    console.log('[presigned-url] Generating presigned URL:', {
+      fileName,
+      fileType,
+      type,
+      companyId,
+    })
 
     // Generate S3 key
     const key = generateS3Key(companyId, type as 'photo' | 'audio', fileName)
@@ -166,15 +199,20 @@ export async function POST(request: NextRequest) {
     const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 })
     const cloudfrontUrl = `https://${process.env.CLOUDFRONT_DOMAIN}/${key}`
 
+    console.log('[presigned-url] Presigned URL generated successfully:', {
+      key,
+      cloudfrontUrl,
+    })
+
     return NextResponse.json({
       url: presignedUrl,
       key,
       cloudfrontUrl,
     })
   } catch (error) {
-    console.error('Error generating presigned URL:', error)
+    console.error('[presigned-url] Error generating presigned URL:', error)
     return NextResponse.json(
-      { error: 'Failed to generate presigned URL' },
+      { error: 'Failed to generate presigned URL', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }
