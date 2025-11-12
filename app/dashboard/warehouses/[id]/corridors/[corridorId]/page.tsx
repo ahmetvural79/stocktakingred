@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useState, useCallback } from 'react'
+import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, ArrowLeft, Trash2 } from 'lucide-react'
 import Link from 'next/link'
@@ -15,15 +15,15 @@ interface ShelfData {
 interface CorridorData {
   id: string
   name: string
-  warehouses: {
+  warehouse: {
     id: string
     name: string
+    company_name: string | null
   }
 }
 
 export default function CorridorDetailPage() {
   const params = useParams()
-  const router = useRouter()
   const warehouseId = params.id as string
   const corridorId = params.corridorId as string
   const [corridor, setCorridor] = useState<CorridorData | null>(null)
@@ -33,36 +33,59 @@ export default function CorridorDetailPage() {
   const [newShelfName, setNewShelfName] = useState('')
   const supabase = createClient()
 
-  useEffect(() => {
-    if (corridorId) {
-      loadCorridor()
-      loadShelves()
-    }
-  }, [corridorId])
-
-  const loadCorridor = async () => {
+  const loadCorridor = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('corridors')
         .select(`
-          *,
+          id,
+          name,
           warehouses (
             id,
-            name
+            name,
+            companies (
+              id,
+              name
+            )
           )
         `)
         .eq('id', corridorId)
         .single()
 
       if (error) throw error
-      setCorridor(data as any)
+      
+      // Handle warehouses as it might be an array or single object from Supabase
+      const warehouses = data?.warehouses
+      if (!warehouses) {
+        throw new Error('Koridor depo bilgisi bulunamadı')
+      }
+
+      // Check if warehouses is an array (Supabase join behavior)
+      const warehouse = Array.isArray(warehouses) ? warehouses[0] : warehouses
+      if (!warehouse) {
+        throw new Error('Koridor depo bilgisi bulunamadı')
+      }
+
+      // Handle companies similarly
+      const companies = warehouse.companies
+      const company = Array.isArray(companies) ? companies[0] : companies
+
+      setCorridor({
+        id: data.id,
+        name: data.name,
+        warehouse: {
+          id: warehouse.id,
+          name: warehouse.name,
+          company_name: company?.name ?? null,
+        },
+      })
     } catch (error) {
       console.error('Error loading corridor:', error)
       alert('Koridor bilgisi yüklenemedi')
     }
-  }
+  }, [corridorId, supabase])
 
-  const loadShelves = async () => {
+  const loadShelves = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('shelves')
@@ -77,7 +100,14 @@ export default function CorridorDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [corridorId, supabase])
+
+  useEffect(() => {
+    if (corridorId) {
+      loadCorridor()
+      loadShelves()
+    }
+  }, [corridorId, loadCorridor, loadShelves])
 
   const handleAddShelf = async () => {
     if (!newShelfName.trim()) {
@@ -106,9 +136,10 @@ export default function CorridorDetailPage() {
       setNewShelfName('')
       setShowAddShelfModal(false)
       await loadShelves()
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error adding shelf:', error)
-      alert(error.message || 'Raf ekleme hatası. Lütfen tekrar deneyin.')
+      const errorMessage = error instanceof Error ? error.message : 'Raf ekleme hatası. Lütfen tekrar deneyin.'
+      alert(errorMessage)
     }
   }
 
@@ -125,9 +156,10 @@ export default function CorridorDetailPage() {
 
       if (error) throw error
       await loadShelves()
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error deleting shelf:', error)
-      alert(`Raf silinemedi: ${error.message}`)
+      const errorMessage = error instanceof Error ? error.message : 'Raf silinemedi'
+      alert(`Raf silinemedi: ${errorMessage}`)
     }
   }
 
@@ -162,9 +194,12 @@ export default function CorridorDetailPage() {
               </Link>
               <div>
                 <h1 className="text-2xl font-bold">{corridor.name}</h1>
-                <p className="text-sm text-gray-600 mt-1">
-                  {corridor.warehouses?.name}
-                </p>
+                <p className="text-sm text-gray-600 mt-1">{corridor.warehouse.name}</p>
+                {corridor.warehouse.company_name && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Firma: {corridor.warehouse.company_name}
+                  </p>
+                )}
               </div>
             </div>
           </div>

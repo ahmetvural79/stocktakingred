@@ -17,6 +17,8 @@ interface WarehouseData {
   id: string
   name: string
   description: string | null
+  company_id: string
+  company_name: string | null
 }
 
 export default function WarehouseDetailPage() {
@@ -41,12 +43,34 @@ export default function WarehouseDetailPage() {
     try {
       const { data, error } = await supabase
         .from('warehouses')
-        .select('*')
+        .select(
+          `
+            id,
+            name,
+            description,
+            company_id,
+            companies (
+              id,
+              name
+            )
+          `
+        )
         .eq('id', warehouseId)
         .single()
 
       if (error) throw error
-      setWarehouse(data as WarehouseData)
+      
+      // Handle companies as it might be an array or single object from Supabase
+      const companies = data?.companies
+      const company = Array.isArray(companies) ? companies[0] : companies
+
+      setWarehouse({
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        company_id: data.company_id,
+        company_name: company?.name ?? null,
+      })
     } catch (error) {
       console.error('Error loading warehouse:', error)
       alert('Depo bilgisi yüklenemedi')
@@ -66,7 +90,12 @@ export default function WarehouseDetailPage() {
 
       if (error) throw error
       
-      const formattedData = (data || []).map((corridor: any) => ({
+      const formattedData = (data || []).map((corridor: {
+        id: string
+        name: string
+        created_at: string
+        shelves_aggregate?: Array<{ count: number }>
+      }) => ({
         id: corridor.id,
         name: corridor.name,
         created_at: corridor.created_at,
@@ -108,9 +137,10 @@ export default function WarehouseDetailPage() {
       setNewCorridorName('')
       setShowAddCorridorModal(false)
       await loadCorridors()
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error adding corridor:', error)
-      alert(error.message || 'Koridor ekleme hatası. Lütfen tekrar deneyin.')
+      const errorMessage = error instanceof Error ? error.message : 'Koridor ekleme hatası. Lütfen tekrar deneyin.'
+      alert(errorMessage)
     }
   }
 
@@ -127,9 +157,10 @@ export default function WarehouseDetailPage() {
 
       if (error) throw error
       await loadCorridors()
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error deleting corridor:', error)
-      alert(`Koridor silinemedi: ${error.message}`)
+      const errorMessage = error instanceof Error ? error.message : 'Koridor silinemedi'
+      alert(`Koridor silinemedi: ${errorMessage}`)
     }
   }
 
@@ -166,6 +197,9 @@ export default function WarehouseDetailPage() {
                 <h1 className="text-2xl font-bold">{warehouse.name}</h1>
                 {warehouse.description && (
                   <p className="text-sm text-gray-600 mt-1">{warehouse.description}</p>
+                )}
+                {warehouse.company_name && (
+                  <p className="text-xs text-gray-500 mt-1">Firma: {warehouse.company_name}</p>
                 )}
               </div>
             </div>

@@ -154,30 +154,13 @@ export default function ERPImportPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold">
-                <span className="text-red-600">the</span>
-                <span className="text-black">Stocktaking</span>
-                <span className="text-red-600"> Red</span>
-              </h1>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <h2 className="text-3xl font-bold text-gray-900">ERP Excel Import</h2>
-          <p className="mt-2 text-gray-600">
-            ERP sisteminden gelen stok listesini Excel formatında yükleyin.
-          </p>
-        </div>
+    <div className="p-6">
+      <div className="mb-6">
+        <h2 className="text-3xl font-bold text-gray-900">ERP Excel Import</h2>
+        <p className="mt-2 text-gray-600">
+          ERP sisteminden gelen stok listesini Excel formatında yükleyin.
+        </p>
+      </div>
 
         {/* Upload Section */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
@@ -287,7 +270,6 @@ export default function ERPImportPanel() {
             </div>
           )}
         </div>
-      </main>
     </div>
   )
 }

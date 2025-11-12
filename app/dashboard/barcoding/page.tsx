@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import BarcodingPanel from '@/components/barcoding/BarcodingPanel'
+import DashboardLayout from '@/components/layout/DashboardLayout'
 
 export default async function BarcodingPage() {
   const supabase = await createClient()
@@ -12,6 +13,33 @@ export default async function BarcodingPage() {
     redirect('/login')
   }
 
-  return <BarcodingPanel />
+  // Get user's company info
+  const { data: userData } = await supabase
+    .from('users')
+    .select('company_id, role, full_name, companies(name)')
+    .eq('id', user.id)
+    .single()
+
+  if (!userData?.company_id) {
+    if (userData?.role !== 'main_admin') {
+      redirect('/login')
+    }
+  }
+
+  const companyName = !userData?.role || userData.role !== 'main_admin'
+    ? (typeof userData?.companies === 'object' && userData.companies !== null
+        ? (userData.companies as { name?: string }).name
+        : undefined)
+    : undefined
+
+  return (
+    <DashboardLayout
+      userName={userData?.full_name || user.email || undefined}
+      companyName={companyName}
+      userRole={userData?.role}
+    >
+      <BarcodingPanel />
+    </DashboardLayout>
+  )
 }
 

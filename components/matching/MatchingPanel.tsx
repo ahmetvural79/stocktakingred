@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Search, Download, FileText, CheckCircle2, Clock, AlertCircle, Edit, Calendar, User, MapPin, Bell, Settings, Mic } from 'lucide-react'
+import { Search, FileText, Calendar, User, MapPin, Mic } from 'lucide-react'
 import Image from 'next/image'
-import ManualMatchingModal from './ManualMatchingModal'
+import MatchingItemPanel from './MatchingItemPanel'
 
 interface CountItem {
   id: string
@@ -34,7 +34,7 @@ interface CountItem {
 interface MatchResult {
   id: string
   count_item_id: string
-  erp_item_id: string
+  erp_item_id: string | null
   matched_score: number
   difference: number
   status: 'pending' | 'matched' | 'rejected'
@@ -44,7 +44,7 @@ interface MatchResult {
     product_code: string
     product_name: string
     stock_qty: number
-  }
+  } | null
 }
 
 export default function MatchingPanel() {
@@ -52,8 +52,173 @@ export default function MatchingPanel() {
   const [matchingItems, setMatchingItems] = useState<MatchResult[]>([])
   const [matchedItems, setMatchedItems] = useState<MatchResult[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedItemForMatch, setSelectedItemForMatch] = useState<CountItem | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
   const supabase = createClient()
+  
+  // Memoize loadData to avoid infinite loops
+  const loadData = useCallback(async () => {
+    try {
+      // Get count items that don't have any match_results (pending or matched)
+      // Exclude items that have pending or matched status
+      const { data: countItems } = await supabase
+        .from('count_items')
+        .select(`
+          *,
+          shelves (
+            name,
+            corridors (
+              name,
+              warehouses (
+                name
+              )
+            )
+          ),
+          count_sessions (
+            created_by,
+            users (
+              full_name
+            )
+          )
+        `)
+        .not('id', 'in', `(SELECT count_item_id FROM match_results WHERE status IN ('pending', 'matched'))`)
+
+      if (countItems) {
+        setPendingItems(countItems as CountItem[])
+      }
+
+      // Get matching items (status = 'pending')
+      // These are items that are currently being matched (erp_item_id can be NULL)
+      const { data: matching } = await supabase
+        .from('match_results')
+        .select(`
+          *,
+          count_items (
+            *,
+            shelves (
+              name,
+              corridors (
+                name,
+                warehouses (
+                  name
+                )
+              )
+            ),
+            count_sessions (
+              created_by,
+              users (
+                full_name
+              )
+            )
+          ),
+          erp_items (
+            id,
+            product_code,
+            product_name,
+            stock_qty
+          )
+        `)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true })
+        .limit(1) // Only show the first one (the one currently being matched)
+
+      if (matching) {
+        setMatchingItems(matching as MatchResult[])
+      }
+
+      // Get matched items (status = 'matched')
+      const { data: matched } = await supabase
+        .from('match_results')
+        .select(`
+          *,
+          count_items (
+            *,
+            shelves (
+              name,
+              corridors (
+                name,
+                warehouses (
+                  name
+                )
+              )
+            ),
+            count_sessions (
+              created_by,
+              users (
+                full_name
+              )
+            )
+          ),
+          erp_items (
+            id,
+            product_code,
+            product_name,
+            stock_qty
+          )
+        `)
+        .eq('status', 'matched')
+        .order('matched_at', { ascending: false })
+        .limit(10)
+
+      if (matched) {
+        setMatchedItems(matched as MatchResult[])
+      }
+    } catch (error) {
+      console.error('Error loading data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [supabase])
+
+  // Auto-move first pending item to "Eşleştiriliyor" when no item is being matched
+  // This happens after a match is completed or when page loads
+  const autoMoveNextItem = useCallback(async () => {
+    // Only auto-move if no item is currently being matched and there are pending items
+    if (matchingItems.length === 0 && pendingItems.length > 0 && !loading) {
+      const firstPendingItem = pendingItems[0]
+      if (!firstPendingItem) return
+      
+      try {
+        // Check if there's already a pending match for this item
+        const { data: existingMatch } = await supabase
+          .from('match_results')
+          .select('id')
+          .eq('count_item_id', firstPendingItem.id)
+          .eq('status', 'pending')
+          .maybeSingle()
+        
+        if (!existingMatch) {
+          const { error } = await supabase
+            .from('match_results')
+            .insert({
+              count_item_id: firstPendingItem.id,
+              erp_item_id: null,
+              status: 'pending',
+              matched_score: 0,
+              difference: 0,
+            })
+          
+          if (!error) {
+            // Reload data to show the item in "Eşleştiriliyor" area
+            await loadData()
+          }
+        }
+      } catch (error) {
+        // Ignore errors (item might already be in matching)
+        console.log('Auto-move check:', error)
+      }
+    }
+  }, [matchingItems.length, pendingItems, loading, loadData, supabase])
+
+  // Auto-move next item when matchingItems becomes empty and there are pending items
+  useEffect(() => {
+    if (!loading && matchingItems.length === 0 && pendingItems.length > 0) {
+      const timer = setTimeout(() => {
+        autoMoveNextItem()
+      }, 500) // Small delay to avoid race conditions
+      
+      return () => clearTimeout(timer)
+    }
+  }, [matchingItems.length, pendingItems.length, loading, autoMoveNextItem])
 
   useEffect(() => {
     loadData()
@@ -122,116 +287,7 @@ export default function MatchingPanel() {
       supabase.removeChannel(countItemsChannel)
       supabase.removeChannel(matchResultsChannel)
     }
-  }, [])
-
-  const loadData = async () => {
-    try {
-      // Get count items without matches
-      const { data: countItems } = await supabase
-        .from('count_items')
-        .select(`
-          *,
-          shelves (
-            name,
-            corridors (
-              name,
-              warehouses (
-                name
-              )
-            )
-          ),
-          count_sessions (
-            created_by,
-            users (
-              full_name
-            )
-          )
-        `)
-        .not('id', 'in', `(SELECT count_item_id FROM match_results WHERE status = 'matched')`)
-
-      if (countItems) {
-        setPendingItems(countItems as CountItem[])
-      }
-
-      // Get matching items (status = 'pending')
-      const { data: matching } = await supabase
-        .from('match_results')
-        .select(`
-          *,
-          count_items (
-            *,
-            shelves (
-              name,
-              corridors (
-                name,
-                warehouses (
-                  name
-                )
-              )
-            ),
-            count_sessions (
-              created_by,
-              users (
-                full_name
-              )
-            )
-          ),
-          erp_items (
-            id,
-            product_code,
-            product_name,
-            stock_qty
-          )
-        `)
-        .eq('status', 'pending')
-
-      if (matching) {
-        setMatchingItems(matching as MatchResult[])
-      }
-
-      // Get matched items (status = 'matched')
-      const { data: matched } = await supabase
-        .from('match_results')
-        .select(`
-          *,
-          count_items (
-            *,
-            shelves (
-              name,
-              corridors (
-                name,
-                warehouses (
-                  name
-                )
-              )
-            ),
-            count_sessions (
-              created_by,
-              users (
-                full_name
-              )
-            )
-          ),
-          erp_items (
-            id,
-            product_code,
-            product_name,
-            stock_qty
-          )
-        `)
-        .eq('status', 'matched')
-        .order('matched_at', { ascending: false })
-        .limit(10)
-
-      if (matched) {
-        setMatchedItems(matched as MatchResult[])
-      }
-    } catch (error) {
-      console.error('Error loading data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [loadData, supabase])
 
   const getShelfLocation = (item: CountItem) => {
     if (!item.shelves) return 'Bilinmiyor'
@@ -252,51 +308,25 @@ export default function MatchingPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-[1920px] mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold">
-                <span className="text-black text-sm">the</span>
-                <span className="text-red-600 text-2xl">Stocktaking</span>
-                <span className="text-red-600">Red</span>
-              </h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 bg-gray-50"
-                />
-              </div>
-              <button className="text-gray-600 hover:text-gray-900 p-2">
-                <Bell className="h-5 w-5" />
-              </button>
-              <button className="text-gray-600 hover:text-gray-900 p-2">
-                <Settings className="h-5 w-5" />
-              </button>
-              <div className="h-8 w-8 rounded-full bg-gray-300"></div>
+    <div className="p-6">
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-4xl font-bold text-gray-900">Ürün Eşleştirme Panosu</h2>
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="text"
+                placeholder="Ara..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 bg-gray-50"
+              />
             </div>
           </div>
-          <div className="flex justify-end mt-2">
-            <button className="bg-blue-600 text-white px-6 py-2.5 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors shadow-sm">
-              <FileText className="h-5 w-5" />
-              <span className="font-medium">+ Yeni Sayım Ekle</span>
-            </button>
-          </div>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-[1920px] mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h2 className="text-4xl font-bold text-gray-900 mb-2">Ürün Eşleştirme Panosu</h2>
-          <p className="text-gray-500 text-lg">Sayılan ürünleri ERP kodları ile eşleştirin.</p>
-        </div>
+        <p className="text-gray-500 text-lg mt-2">Sayılan ürünleri ERP kodları ile eşleştirin.</p>
+      </div>
 
         {/* Filters */}
         <div className="mb-8 flex space-x-4">
@@ -329,7 +359,31 @@ export default function MatchingPanel() {
                 <div
                   key={item.id}
                   className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all cursor-pointer"
-                  onClick={() => setSelectedItemForMatch(item)}
+                  onClick={async () => {
+                    // Move item to "Eşleştiriliyor" by creating a match_result with status='pending'
+                    try {
+                      const { error } = await supabase
+                        .from('match_results')
+                        .insert({
+                          count_item_id: item.id,
+                          erp_item_id: null, // Will be set when ERP item is selected
+                          status: 'pending',
+                          matched_score: 0,
+                          difference: 0,
+                        })
+                      
+                      if (error) {
+                        console.error('Error moving item to matching:', error)
+                        alert('Ürün eşleştiriliyor alanına taşınırken hata oluştu')
+                      } else {
+                        // Reload data to show the item in "Eşleştiriliyor" area
+                        loadData()
+                      }
+                    } catch (error) {
+                      console.error('Error moving item to matching:', error)
+                      alert('Ürün eşleştiriliyor alanına taşınırken hata oluştu')
+                    }
+                  }}
                 >
                   {item.photo_url && (
                     <div className="relative w-full h-40 mb-4 rounded-lg overflow-hidden bg-gray-100">
@@ -376,44 +430,22 @@ export default function MatchingPanel() {
             </div>
             <div className="space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto">
               {matchingItems.map((match) => (
-                <div
+                <MatchingItemPanel
                   key={match.id}
-                  className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all"
-                >
-                  {match.count_items.photo_url && (
-                    <div className="relative w-full h-40 mb-4 rounded-lg overflow-hidden bg-gray-100">
-                      <Image
-                        src={match.count_items.photo_url}
-                        alt={match.count_items.product_name || 'Ürün'}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <p className="font-semibold text-gray-900 text-base">
-                      Adet: {match.count_items.quantity}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Raf: {getShelfLocation(match.count_items)}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Sayıcı: {getCounterName(match.count_items)}
-                    </p>
-                  </div>
-                  <div className="mt-4 flex items-center space-x-3 pt-3 border-t border-gray-100">
-                    <button className="text-gray-500 hover:text-gray-700 transition-colors">
-                      <Mic className="h-5 w-5" />
-                    </button>
-                    <button className="text-gray-500 hover:text-gray-700 transition-colors">
-                      <FileText className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
+                  match={match}
+                  onMatched={async () => {
+                    await loadData()
+                    // After a match is completed, auto-move next item if available
+                    setTimeout(async () => {
+                      await autoMoveNextItem()
+                    }, 500)
+                  }}
+                />
               ))}
               {matchingItems.length === 0 && (
                 <div className="text-center py-12 text-gray-400">
-                  <p>Eşleştirilen ürün yok</p>
+                  <p>Eşleştiriliyor alanında ürün yok</p>
+                  <p className="text-sm mt-2">Bekleyenlerden bir ürün seçin</p>
                 </div>
               )}
             </div>
@@ -454,12 +486,14 @@ export default function MatchingPanel() {
                       Sayıcı: {getCounterName(match.count_items)}
                     </p>
                   </div>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-                    <p className="text-sm font-semibold text-green-800 mb-1">
-                      ERP: {match.erp_items.product_code}
-                    </p>
-                    <p className="text-sm text-green-700">{match.erp_items.product_name}</p>
-                  </div>
+                  {match.erp_items && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                      <p className="text-sm font-semibold text-green-800 mb-1">
+                        ERP: {match.erp_items.product_code}
+                      </p>
+                      <p className="text-sm text-green-700">{match.erp_items.product_name}</p>
+                    </div>
+                  )}
                   <div className="flex items-center space-x-3 pt-3 border-t border-gray-100">
                     <button className="text-gray-500 hover:text-gray-700 transition-colors">
                       <Mic className="h-5 w-5" />
@@ -478,20 +512,7 @@ export default function MatchingPanel() {
             </div>
           </div>
         </div>
-      </main>
 
-      {/* Manual Matching Modal */}
-      {selectedItemForMatch && (
-        <ManualMatchingModal
-          countItem={selectedItemForMatch}
-          isOpen={!!selectedItemForMatch}
-          onClose={() => setSelectedItemForMatch(null)}
-          onMatched={() => {
-            loadData()
-            setSelectedItemForMatch(null)
-          }}
-        />
-      )}
     </div>
   )
 }

@@ -1,9 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import CountSessionsList from '@/components/count-sessions/CountSessionsList'
+import CountSessionDetail from '@/components/count-sessions/CountSessionDetail'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 
-export default async function CountSessionsPage() {
+interface PageProps {
+  params: Promise<{
+    id: string
+  }>
+}
+
+export default async function CountSessionDetailPage({ params }: PageProps) {
+  const { id } = await params
   const supabase = await createClient()
   const {
     data: { user },
@@ -32,13 +39,32 @@ export default async function CountSessionsPage() {
         : undefined)
     : undefined
 
+  // Get count session
+  const { data: session } = await supabase
+    .from('count_sessions')
+    .select(`
+      *,
+      warehouses (
+        name
+      ),
+      users (
+        full_name
+      )
+    `)
+    .eq('id', id)
+    .single()
+
+  if (!session) {
+    redirect('/dashboard/count-sessions')
+  }
+
   return (
     <DashboardLayout
       userName={userData?.full_name || user.email || undefined}
       companyName={companyName}
       userRole={userData?.role}
     >
-      <CountSessionsList />
+      <CountSessionDetail sessionId={id} />
     </DashboardLayout>
   )
 }

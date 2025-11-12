@@ -199,49 +199,32 @@ export default function BarcodingPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold">
-                <span className="text-red-600">the</span>
-                <span className="text-black">Stocktaking</span>
-                <span className="text-red-600"> Red</span>
-              </h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                />
-              </div>
-              {selectedItems.size > 0 && (
-                <button
-                  onClick={handlePrintSelected}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700"
-                >
-                  <Printer className="h-5 w-5" />
-                  <span>Seçilenleri Yazdır ({selectedItems.size})</span>
-                </button>
-              )}
-            </div>
+    <div className="p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900">Barkodlama</h2>
+          <p className="mt-2 text-gray-600">Barkod yazdırma ve etiketleme işlemlerini yönetin.</p>
+        </div>
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <input
+              type="text"
+              placeholder="Ara..."
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
           </div>
+          {selectedItems.size > 0 && (
+            <button
+              onClick={handlePrintSelected}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700"
+            >
+              <Printer className="h-5 w-5" />
+              <span>Seçilenleri Yazdır ({selectedItems.size})</span>
+            </button>
+          )}
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <h2 className="text-3xl font-bold text-gray-900">Barkodlama ve Etiketleme</h2>
-          <p className="mt-2 text-gray-600">
-            Sayımı tamamlanan ürünler için barkod oluşturun ve etiketleme sürecini yönetin.
-          </p>
-        </div>
+      </div>
 
         {/* Columns */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -362,7 +345,6 @@ export default function BarcodingPanel() {
             </div>
           </div>
         </div>
-      </main>
     </div>
   )
 }
