@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Search, FileText, Calendar, User, MapPin, Mic } from 'lucide-react'
 import Image from 'next/image'
 import MatchingItemPanel from './MatchingItemPanel'
+import { normalizeImageUrl } from '@/lib/utils/image-url'
 
 interface CountItem {
   id: string
@@ -12,6 +13,7 @@ interface CountItem {
   quantity: number
   quantity_unit: string
   photo_url: string | null
+  audio_url: string | null
   note: string | null
   shelf_id: string | null
   shelves: {
@@ -38,6 +40,8 @@ interface MatchResult {
   matched_score: number
   difference: number
   status: 'pending' | 'matched' | 'rejected'
+  matched_at?: string | null
+  created_at?: string
   count_items: CountItem
   erp_items: {
     id: string
@@ -58,9 +62,10 @@ export default function MatchingPanel() {
   // Memoize loadData to avoid infinite loops
   const loadData = useCallback(async () => {
     try {
-      // Get count items that don't have any match_results (pending or matched)
-      // Exclude items that have pending or matched status
-      const { data: countItems } = await supabase
+      setLoading(true)
+
+      // Get ALL count items first
+      const { data: allCountItems, error: countItemsError } = await supabase
         .from('count_items')
         .select(`
           *,
@@ -80,15 +85,15 @@ export default function MatchingPanel() {
             )
           )
         `)
-        .not('id', 'in', `(SELECT count_item_id FROM match_results WHERE status IN ('pending', 'matched'))`)
+        .order('created_at', { ascending: false })
 
-      if (countItems) {
-        setPendingItems(countItems as CountItem[])
+      if (countItemsError) {
+        console.error('Error loading count items:', countItemsError)
+        setPendingItems([])
       }
 
-      // Get matching items (status = 'pending')
-      // These are items that are currently being matched (erp_item_id can be NULL)
-      const { data: matching } = await supabase
+      // Get ALL match results (pending and matched)
+      const { data: allMatchResults, error: matchResultsError } = await supabase
         .from('match_results')
         .select(`
           *,
@@ -117,51 +122,43 @@ export default function MatchingPanel() {
             stock_qty
           )
         `)
-        .eq('status', 'pending')
+        .in('status', ['pending', 'matched'])
         .order('created_at', { ascending: true })
-        .limit(1) // Only show the first one (the one currently being matched)
 
-      if (matching) {
-        setMatchingItems(matching as MatchResult[])
+      if (matchResultsError) {
+        console.error('Error loading match results:', matchResultsError)
       }
 
-      // Get matched items (status = 'matched')
-      const { data: matched } = await supabase
-        .from('match_results')
-        .select(`
-          *,
-          count_items (
-            *,
-            shelves (
-              name,
-              corridors (
-                name,
-                warehouses (
-                  name
-                )
-              )
-            ),
-            count_sessions (
-              created_by,
-              users (
-                full_name
-              )
-            )
-          ),
-          erp_items (
-            id,
-            product_code,
-            product_name,
-            stock_qty
-          )
-        `)
-        .eq('status', 'matched')
-        .order('matched_at', { ascending: false })
-        .limit(10)
+      // Process data in JavaScript
+      const allItems = (allCountItems || []) as CountItem[]
+      const allMatches = (allMatchResults || []) as MatchResult[]
 
-      if (matched) {
-        setMatchedItems(matched as MatchResult[])
-      }
+      // Get items that have match_results with status='pending' or 'matched'
+      const itemsWithMatches = new Set(
+        allMatches.map((match) => match.count_item_id)
+      )
+
+      // Filter pending items: count_items that don't have any match_results
+      const pending = allItems.filter((item) => !itemsWithMatches.has(item.id))
+      setPendingItems(pending)
+
+      // Filter matching items: match_results with status='pending' (limit to 1)
+      const matching = allMatches
+        .filter((match) => match.status === 'pending')
+        .slice(0, 1) // Only show the first one
+      setMatchingItems(matching)
+
+      // Filter matched items: match_results with status='matched' (limit to 10)
+      const matched = allMatches
+        .filter((match) => match.status === 'matched')
+        .slice(0, 10)
+        .sort((a, b) => {
+          // Sort by matched_at if available, otherwise by created_at
+          const aDate = a.matched_at ? new Date(a.matched_at).getTime() : 0
+          const bDate = b.matched_at ? new Date(b.matched_at).getTime() : 0
+          return bDate - aDate
+        })
+      setMatchedItems(matched)
     } catch (error) {
       console.error('Error loading data:', error)
     } finally {
@@ -385,13 +382,14 @@ export default function MatchingPanel() {
                     }
                   }}
                 >
-                  {item.photo_url && (
+                  {item.photo_url && normalizeImageUrl(item.photo_url) && (
                     <div className="relative w-full h-40 mb-4 rounded-lg overflow-hidden bg-gray-100">
                       <Image
-                        src={item.photo_url}
+                        src={normalizeImageUrl(item.photo_url)!}
                         alt={item.product_name || 'Ürün'}
                         fill
                         className="object-cover"
+                        unoptimized
                       />
                     </div>
                   )}
@@ -465,13 +463,14 @@ export default function MatchingPanel() {
                   key={match.id}
                   className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all"
                 >
-                  {match.count_items.photo_url && (
+                  {match.count_items.photo_url && normalizeImageUrl(match.count_items.photo_url) && (
                     <div className="relative w-full h-40 mb-4 rounded-lg overflow-hidden bg-gray-100">
                       <Image
-                        src={match.count_items.photo_url}
+                        src={normalizeImageUrl(match.count_items.photo_url)!}
                         alt={match.count_items.product_name || 'Ürün'}
                         fill
                         className="object-cover"
+                        unoptimized
                       />
                     </div>
                   )}

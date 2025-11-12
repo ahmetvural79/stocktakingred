@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X, Search, CheckCircle2, XCircle } from 'lucide-react'
 import { autoMatch, createMatchResults } from '@/lib/matching/auto-match'
+import Image from 'next/image'
+import { normalizeImageUrl } from '@/lib/utils/image-url'
 
 interface CountItem {
   id: string
@@ -138,12 +140,16 @@ export default function ManualMatchingModal({
         {/* Count Item Info */}
         <div className="p-6 border-b bg-gray-50">
           <div className="flex items-start space-x-4">
-            {countItem.photo_url && (
-              <img
-                src={countItem.photo_url}
-                alt="Product"
-                className="w-24 h-24 object-cover rounded"
-              />
+            {countItem.photo_url && normalizeImageUrl(countItem.photo_url) && (
+              <div className="relative w-24 h-24 rounded overflow-hidden">
+                <Image
+                  src={normalizeImageUrl(countItem.photo_url)!}
+                  alt="Product"
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
             )}
             <div>
               <h3 className="font-medium text-lg">{countItem.product_name || 'Ürün'}</h3>

@@ -98,53 +98,221 @@ export default function ERPImportPanel() {
       // Get user's company
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser()
-      if (!user) throw new Error('Kullanıcı bulunamadı.')
+      
+      if (userError) {
+        console.error('[ERP Import] Auth error:', userError)
+        throw new Error(`Kimlik doğrulama hatası: ${userError.message}`)
+      }
+      
+      if (!user) {
+        throw new Error('Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.')
+      }
 
-      const { data: userData } = await supabase
+      console.log('[ERP Import] User authenticated:', { userId: user.id, email: user.email })
+
+      const { data: userData, error: userDataError } = await supabase
         .from('users')
-        .select('company_id')
+        .select('company_id, role')
         .eq('id', user.id)
         .single()
 
-      if (!userData?.company_id) throw new Error('Firma bilgisi bulunamadı.')
+      if (userDataError) {
+        console.error('[ERP Import] User data error:', {
+          error: userDataError,
+          message: userDataError.message,
+          details: userDataError.details,
+          hint: userDataError.hint,
+        })
+        throw new Error(`Kullanıcı bilgisi alınamadı: ${userDataError.message || userDataError.details || 'Bilinmeyen hata'}`)
+      }
+
+      if (!userData) {
+        throw new Error('Kullanıcı kaydı bulunamadı. Lütfen yöneticinizle iletişime geçin.')
+      }
+
+      if (!userData.company_id && userData.role !== 'main_admin') {
+        throw new Error('Firma bilgisi bulunamadı. Lütfen yöneticinizle iletişime geçin.')
+      }
+
+      console.log('[ERP Import] User data loaded:', {
+        userId: user.id,
+        companyId: userData.company_id,
+        role: userData.role,
+      })
 
       // Upload file to storage (optional - for now we'll just process it)
       // In production, upload to Supabase Storage first
 
       // Create import record
+      // For main_admin, we need to handle company_id differently
+      // Since erp_imports requires company_id, main_admin should select a company
+      // For now, we'll require company_id for all users including main_admin
+      if (!userData.company_id && userData.role !== 'main_admin') {
+        throw new Error('Firma bilgisi bulunamadı. Lütfen yöneticinizle iletişime geçin.')
+      }
+
+      // For main_admin without company_id, we can't create import
+      // In future, we might allow main_admin to select a company
+      if (userData.role === 'main_admin' && !userData.company_id) {
+        throw new Error('Main admin kullanıcıları için firma seçimi gerekli. Lütfen bir firmaya atanın.')
+      }
+
+      console.log('[ERP Import] Creating import record:', {
+        companyId: userData.company_id,
+        fileName: file.name,
+        userId: user.id,
+      })
+
       const { data: importRecord, error: importError } = await supabase
         .from('erp_imports')
         .insert({
-          company_id: userData.company_id,
+          company_id: userData.company_id!,
           file_name: file.name,
           imported_by: user.id,
         })
         .select()
         .single()
 
-      if (importError) throw importError
-      if (!importRecord) throw new Error('Import kaydı oluşturulamadı.')
+      if (importError) {
+        console.error('[ERP Import] Import record error:', {
+          error: importError,
+          message: importError.message,
+          details: importError.details,
+          hint: importError.hint,
+          code: importError.code,
+        })
+        throw new Error(
+          importError.message ||
+            importError.details ||
+            importError.hint ||
+            `Import kaydı oluşturulamadı: ${importError.code || 'Bilinmeyen hata'}`
+        )
+      }
+      
+      if (!importRecord) {
+        throw new Error('Import kaydı oluşturulamadı.')
+      }
 
-      // Process and insert ERP items
+      console.log('[ERP Import] Import record created:', {
+        importId: importRecord.id,
+        companyId: importRecord.company_id,
+      })
+
+      // Process and validate ERP items
       // Assume Excel has columns: product_code, product_name, stock_qty
-      const erpItems = jsonData.map((row: any) => ({
-        erp_import_id: importRecord.id,
-        product_code: row.product_code || row['Ürün Kodu'] || row['Product Code'] || '',
-        product_name: row.product_name || row['Ürün Adı'] || row['Product Name'] || '',
-        stock_qty: parseInt(row.stock_qty || row['Stok Miktarı'] || row['Stock Qty'] || '0', 10),
-        unit: row.unit || row['Birim'] || 'adet',
-      }))
+      console.log('[ERP Import] Processing Excel data:', {
+        rowCount: jsonData.length,
+        firstRow: jsonData[0],
+        columns: jsonData.length > 0 ? Object.keys(jsonData[0]) : [],
+      })
 
-      const { error: itemsError } = await supabase.from('erp_items').insert(erpItems)
+      const erpItems = jsonData
+        .map((row: any, index: number) => {
+          const productCode = String(row.product_code || row['Ürün Kodu'] || row['Product Code'] || '').trim()
+          const productName = String(row.product_name || row['Ürün Adı'] || row['Product Name'] || '').trim()
+          const stockQtyStr = String(row.stock_qty || row['Stok Miktarı'] || row['Stock Qty'] || '0').trim()
+          const stockQty = parseInt(stockQtyStr, 10)
+          const unit = String(row.unit || row['Birim'] || row['Unit'] || 'adet').trim()
 
-      if (itemsError) throw itemsError
+          // Validate required fields
+          if (!productCode) {
+            console.warn(`[ERP Import] Row ${index + 1}: Missing product_code`)
+            return null
+          }
+          if (!productName) {
+            console.warn(`[ERP Import] Row ${index + 1}: Missing product_name`)
+            return null
+          }
+          if (isNaN(stockQty)) {
+            console.warn(`[ERP Import] Row ${index + 1}: Invalid stock_qty: ${stockQtyStr}`)
+            return null
+          }
+
+          return {
+            erp_import_id: importRecord.id,
+            product_code: productCode,
+            product_name: productName,
+            stock_qty: stockQty,
+            unit: unit || 'adet',
+          }
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null)
+
+      if (erpItems.length === 0) {
+        throw new Error('Geçerli ürün bulunamadı. Lütfen Excel dosyasında product_code ve product_name kolonlarının dolu olduğundan emin olun.')
+      }
+
+      console.log('[ERP Import] Validated ERP items:', {
+        validCount: erpItems.length,
+        invalidCount: jsonData.length - erpItems.length,
+        sampleItem: erpItems[0],
+      })
+
+      // Insert ERP items
+      const { data: insertedItems, error: itemsError } = await supabase
+        .from('erp_items')
+        .insert(erpItems)
+        .select()
+
+      if (itemsError) {
+        console.error('[ERP Import] Insert error:', {
+          error: itemsError,
+          message: itemsError.message,
+          details: itemsError.details,
+          hint: itemsError.hint,
+          code: itemsError.code,
+        })
+        throw new Error(
+          itemsError.message ||
+            itemsError.details ||
+            itemsError.hint ||
+            `ERP ürünleri eklenirken hata oluştu: ${itemsError.code || 'Bilinmeyen hata'}`
+        )
+      }
+
+      console.log('[ERP Import] Successfully inserted items:', {
+        count: insertedItems?.length || erpItems.length,
+      })
 
       setSuccess(`${erpItems.length} ürün başarıyla import edildi.`)
       loadImports()
     } catch (err: any) {
-      setError(err.message || 'Import işlemi başarısız oldu.')
-      console.error('Import error:', err)
+      // Enhanced error handling
+      let errorMessage = 'Import işlemi başarısız oldu.'
+      
+      if (err instanceof Error) {
+        errorMessage = err.message
+      } else if (err && typeof err === 'object') {
+        // Handle Supabase errors
+        if (err.message) {
+          errorMessage = err.message
+        } else if (err.details) {
+          errorMessage = err.details
+        } else if (err.hint) {
+          errorMessage = err.hint
+        } else if (err.code) {
+          errorMessage = `Hata kodu: ${err.code}`
+        } else {
+          // Try to stringify the error object
+          try {
+            errorMessage = JSON.stringify(err)
+          } catch {
+            errorMessage = 'Bilinmeyen hata oluştu'
+          }
+        }
+      } else if (typeof err === 'string') {
+        errorMessage = err
+      }
+
+      console.error('[ERP Import] Error details:', {
+        error: err,
+        message: errorMessage,
+        stack: err instanceof Error ? err.stack : undefined,
+      })
+
+      setError(errorMessage)
     } finally {
       setUploading(false)
       if (fileInputRef.current) {

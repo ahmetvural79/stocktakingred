@@ -6,7 +6,8 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "generate:erp-sample": "npx tsx scripts/generate-sample-erp-excel.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.490.0",
