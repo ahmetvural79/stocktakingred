@@ -16,6 +16,7 @@ interface CountItem {
   audio_url: string | null
   note: string | null
   shelf_id: string | null
+  created_at?: string | null
   shelves: {
     name: string
     corridors: {
@@ -160,7 +161,7 @@ export default function MatchingPanel() {
       }
 
       const { data: allCountItems, error: countItemsError } = await countItemsQuery
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: true }) // FIFO: En eski önce
 
       if (countItemsError) {
         console.error('Error loading count items:', countItemsError)
@@ -228,16 +229,24 @@ export default function MatchingPanel() {
       // Apply search query filter if provided
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim()
-        const filteredItems = allItems.filter((item) => {
-          const productName = item.product_name?.toLowerCase() || ''
-          const shelfName = item.shelves?.name?.toLowerCase() || ''
-          const counterName = item.count_sessions?.users?.full_name?.toLowerCase() || ''
-          return productName.includes(query) || shelfName.includes(query) || counterName.includes(query)
-        })
-        setPendingItems(filteredItems.filter((item) => {
-          const itemsWithMatches = new Set(allMatches.map((match) => match.count_item_id))
-          return !itemsWithMatches.has(item.id)
-        }))
+        const filteredItems = allItems
+          .filter((item) => {
+            const productName = item.product_name?.toLowerCase() || ''
+            const shelfName = item.shelves?.name?.toLowerCase() || ''
+            const counterName = item.count_sessions?.users?.full_name?.toLowerCase() || ''
+            return productName.includes(query) || shelfName.includes(query) || counterName.includes(query)
+          })
+          .filter((item) => {
+            const itemsWithMatches = new Set(allMatches.map((match) => match.count_item_id))
+            return !itemsWithMatches.has(item.id)
+          })
+          .sort((a, b) => {
+            // FIFO: En eski önce
+            const aDate = new Date(a.created_at || 0).getTime()
+            const bDate = new Date(b.created_at || 0).getTime()
+            return aDate - bDate
+          })
+        setPendingItems(filteredItems)
       } else {
         // Get items that have match_results with status='pending' or 'matched'
         const itemsWithMatches = new Set(
@@ -245,14 +254,28 @@ export default function MatchingPanel() {
         )
 
         // Filter pending items: count_items that don't have any match_results
-        const pending = allItems.filter((item) => !itemsWithMatches.has(item.id))
+        // FIFO: En eski kayıtlar önce (created_at ascending zaten sıralı)
+        const pending = allItems
+          .filter((item) => !itemsWithMatches.has(item.id))
+          .sort((a, b) => {
+            // En eski önce (FIFO)
+            const aDate = new Date(a.created_at || 0).getTime()
+            const bDate = new Date(b.created_at || 0).getTime()
+            return aDate - bDate
+          })
         setPendingItems(pending)
       }
 
-      // Filter matching items: match_results with status='pending' (limit to 1)
+      // Filter matching items: match_results with status='pending' (FIFO: sadece 1 adet, en eski)
       const matching = allMatches
         .filter((match) => match.status === 'pending')
-        .slice(0, 1) // Only show the first one
+        .sort((a, b) => {
+          // En eski match_result önce (FIFO)
+          const aDate = new Date(a.created_at || 0).getTime()
+          const bDate = new Date(b.created_at || 0).getTime()
+          return aDate - bDate
+        })
+        .slice(0, 1) // Sadece 1 adet (en eski olan)
       setMatchingItems(matching)
 
       // Filter matched items: match_results with status='matched' (limit to 10)
@@ -279,13 +302,13 @@ export default function MatchingPanel() {
       }
 
       matched = matched
-        .slice(0, 10)
         .sort((a, b) => {
-          // Sort by matched_at if available, otherwise by created_at
+          // En yeni eşleştirilenler önce (matched_at descending)
           const aDate = a.matched_at ? new Date(a.matched_at).getTime() : 0
           const bDate = b.matched_at ? new Date(b.matched_at).getTime() : 0
           return bDate - aDate
         })
+        .slice(0, 50) // Daha fazla kayıt göster (limit kaldırıldı, sadece performans için 50)
       setMatchedItems(matched)
     } catch (error) {
       console.error('Error loading data:', error)
@@ -505,13 +528,31 @@ export default function MatchingPanel() {
               </span>
             </div>
             <div className="space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto">
-              {pendingItems.map((item) => (
+              {pendingItems.map((item, index) => (
                 <div
                   key={item.id}
-                  className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all cursor-pointer"
+                  className={`bg-white border rounded-xl p-4 transition-all ${
+                    index === 0
+                      ? 'border-red-500 border-2 shadow-md ring-2 ring-red-200 cursor-pointer hover:shadow-lg'
+                      : 'border-gray-200 cursor-not-allowed opacity-60'
+                  }`}
                   onClick={async (e) => {
                     // Prevent event bubbling to avoid accidental clicks
                     e.stopPropagation()
+                    
+                    // FIFO mantığı: Sadece ilk sıradaki (en eski) item eşleştirme paneline geçebilir
+                    const isFirstItem = pendingItems.length > 0 && pendingItems[0].id === item.id
+                    if (!isFirstItem) {
+                      // Kullanıcıya bilgi ver
+                      alert('Lütfen sıradaki ilk ürünü eşleştirin. FIFO (İlk Gelen İlk Çıkar) mantığı ile çalışıyoruz.')
+                      return
+                    }
+
+                    // Eşleştirme panelinde zaten bir item varsa, yeni item eklenemez
+                    if (matchingItems.length > 0) {
+                      alert('Eşleştirme panelinde zaten bir ürün var. Lütfen önce mevcut ürünü eşleştirin.')
+                      return
+                    }
                     
                     // Check if item already has a match_result
                     const { data: existingMatch } = await supabase
@@ -524,6 +565,7 @@ export default function MatchingPanel() {
                     if (existingMatch) {
                       // Item already has a match, don't create duplicate
                       console.log('Item already has a match result')
+                      loadData() // Reload to sync state
                       return
                     }
 
@@ -570,6 +612,11 @@ export default function MatchingPanel() {
                     </div>
                   )}
                   <div className="space-y-2">
+                    {index === 0 && (
+                      <div className="mb-2 px-2 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded-full inline-block">
+                        Sıradaki İlk Ürün (FIFO)
+                      </div>
+                    )}
                     <p className="font-semibold text-gray-900 text-base">
                       Adet: {item.quantity}
                     </p>
