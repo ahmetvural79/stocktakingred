@@ -26,6 +26,7 @@ interface CountItem {
     }
   } | null
   count_sessions: {
+    id: string
     created_by: string | null
     users: {
       full_name: string | null
@@ -51,21 +52,87 @@ interface MatchResult {
   } | null
 }
 
+interface CountSession {
+  id: string
+  warehouse_id: string
+  status: 'pending' | 'matched' | 'exported' | 'completed'
+  created_at: string
+  warehouses: {
+    name: string
+  } | null
+  users: {
+    full_name: string | null
+  } | null
+}
+
 export default function MatchingPanel() {
   const [pendingItems, setPendingItems] = useState<CountItem[]>([])
   const [matchingItems, setMatchingItems] = useState<MatchResult[]>([])
   const [matchedItems, setMatchedItems] = useState<MatchResult[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [countSessions, setCountSessions] = useState<CountSession[]>([])
+  const [selectedSessionId, setSelectedSessionId] = useState<string>('all')
   const supabase = createClient()
   
+  // Load count sessions for dropdown
+  const loadCountSessions = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('count_sessions')
+        .select(`
+          id,
+          warehouse_id,
+          status,
+          created_at,
+          warehouses (
+            name
+          ),
+          users (
+            full_name
+          )
+        `)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error loading count sessions:', error)
+        setCountSessions([])
+      } else {
+        // Map the data to match the CountSession interface
+        const sessions: CountSession[] = (data || []).map((session: {
+          id: string
+          warehouse_id: string
+          status: string
+          created_at: string
+          warehouses: { name: string } | { name: string }[] | null
+          users: { full_name: string | null } | { full_name: string | null }[] | null
+        }) => ({
+          id: session.id,
+          warehouse_id: session.warehouse_id,
+          status: session.status as 'pending' | 'matched' | 'exported' | 'completed',
+          created_at: session.created_at,
+          warehouses: Array.isArray(session.warehouses) 
+            ? (session.warehouses[0] || null)
+            : (session.warehouses || null),
+          users: Array.isArray(session.users)
+            ? (session.users[0] || null)
+            : (session.users || null),
+        }))
+        setCountSessions(sessions)
+      }
+    } catch (error) {
+      console.error('Error loading count sessions:', error)
+      setCountSessions([])
+    }
+  }, [supabase])
+
   // Memoize loadData to avoid infinite loops
   const loadData = useCallback(async () => {
     try {
       setLoading(true)
 
-      // Get ALL count items first
-      const { data: allCountItems, error: countItemsError } = await supabase
+      // Build query for count items
+      let countItemsQuery = supabase
         .from('count_items')
         .select(`
           *,
@@ -79,12 +146,20 @@ export default function MatchingPanel() {
             )
           ),
           count_sessions (
+            id,
             created_by,
             users (
               full_name
             )
           )
         `)
+
+      // Filter by selected session if not 'all'
+      if (selectedSessionId !== 'all') {
+        countItemsQuery = countItemsQuery.eq('count_session_id', selectedSessionId)
+      }
+
+      const { data: allCountItems, error: countItemsError } = await countItemsQuery
         .order('created_at', { ascending: false })
 
       if (countItemsError) {
@@ -92,8 +167,8 @@ export default function MatchingPanel() {
         setPendingItems([])
       }
 
-      // Get ALL match results (pending and matched)
-      const { data: allMatchResults, error: matchResultsError } = await supabase
+      // Build query for match results
+      const matchResultsQuery = supabase
         .from('match_results')
         .select(`
           *,
@@ -109,6 +184,7 @@ export default function MatchingPanel() {
               )
             ),
             count_sessions (
+              id,
               created_by,
               users (
                 full_name
@@ -123,6 +199,14 @@ export default function MatchingPanel() {
           )
         `)
         .in('status', ['pending', 'matched'])
+
+      // Filter match results by session if selected
+      if (selectedSessionId !== 'all') {
+        // We need to filter by count_item's count_session_id
+        // This requires a join, so we'll filter in JavaScript after fetching
+      }
+
+      const { data: allMatchResults, error: matchResultsError } = await matchResultsQuery
         .order('created_at', { ascending: true })
 
       if (matchResultsError) {
@@ -131,16 +215,39 @@ export default function MatchingPanel() {
 
       // Process data in JavaScript
       const allItems = (allCountItems || []) as CountItem[]
-      const allMatches = (allMatchResults || []) as MatchResult[]
+      let allMatches = (allMatchResults || []) as MatchResult[]
 
-      // Get items that have match_results with status='pending' or 'matched'
-      const itemsWithMatches = new Set(
-        allMatches.map((match) => match.count_item_id)
-      )
+      // Filter match results by session if selected (since we can't filter in SQL join)
+      if (selectedSessionId !== 'all') {
+        allMatches = allMatches.filter((match) => {
+          const countItem = match.count_items as CountItem
+          return countItem.count_sessions?.id === selectedSessionId
+        })
+      }
 
-      // Filter pending items: count_items that don't have any match_results
-      const pending = allItems.filter((item) => !itemsWithMatches.has(item.id))
-      setPendingItems(pending)
+      // Apply search query filter if provided
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim()
+        const filteredItems = allItems.filter((item) => {
+          const productName = item.product_name?.toLowerCase() || ''
+          const shelfName = item.shelves?.name?.toLowerCase() || ''
+          const counterName = item.count_sessions?.users?.full_name?.toLowerCase() || ''
+          return productName.includes(query) || shelfName.includes(query) || counterName.includes(query)
+        })
+        setPendingItems(filteredItems.filter((item) => {
+          const itemsWithMatches = new Set(allMatches.map((match) => match.count_item_id))
+          return !itemsWithMatches.has(item.id)
+        }))
+      } else {
+        // Get items that have match_results with status='pending' or 'matched'
+        const itemsWithMatches = new Set(
+          allMatches.map((match) => match.count_item_id)
+        )
+
+        // Filter pending items: count_items that don't have any match_results
+        const pending = allItems.filter((item) => !itemsWithMatches.has(item.id))
+        setPendingItems(pending)
+      }
 
       // Filter matching items: match_results with status='pending' (limit to 1)
       const matching = allMatches
@@ -149,8 +256,29 @@ export default function MatchingPanel() {
       setMatchingItems(matching)
 
       // Filter matched items: match_results with status='matched' (limit to 10)
-      const matched = allMatches
-        .filter((match) => match.status === 'matched')
+      // Apply search filter if provided
+      let matched = allMatches.filter((match) => match.status === 'matched')
+      
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim()
+        matched = matched.filter((match) => {
+          const countItem = match.count_items as CountItem
+          const productName = countItem.product_name?.toLowerCase() || ''
+          const shelfName = countItem.shelves?.name?.toLowerCase() || ''
+          const counterName = countItem.count_sessions?.users?.full_name?.toLowerCase() || ''
+          const erpCode = match.erp_items?.product_code?.toLowerCase() || ''
+          const erpName = match.erp_items?.product_name?.toLowerCase() || ''
+          return (
+            productName.includes(query) ||
+            shelfName.includes(query) ||
+            counterName.includes(query) ||
+            erpCode.includes(query) ||
+            erpName.includes(query)
+          )
+        })
+      }
+
+      matched = matched
         .slice(0, 10)
         .sort((a, b) => {
           // Sort by matched_at if available, otherwise by created_at
@@ -164,7 +292,7 @@ export default function MatchingPanel() {
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [supabase, selectedSessionId, searchQuery])
 
   // Auto-move first pending item to "Eşleştiriliyor" when no item is being matched
   // This happens after a match is completed or when page loads
@@ -216,6 +344,10 @@ export default function MatchingPanel() {
       return () => clearTimeout(timer)
     }
   }, [matchingItems.length, pendingItems.length, loading, autoMoveNextItem])
+
+  useEffect(() => {
+    loadCountSessions()
+  }, [loadCountSessions])
 
   useEffect(() => {
     loadData()
@@ -310,6 +442,27 @@ export default function MatchingPanel() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-4xl font-bold text-gray-900">Ürün Eşleştirme Panosu</h2>
           <div className="flex items-center space-x-4">
+            {/* Count Session Dropdown */}
+            <div className="relative">
+              <select
+                value={selectedSessionId}
+                onChange={(e) => setSelectedSessionId(e.target.value)}
+                className="pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 bg-white text-gray-700 font-medium cursor-pointer appearance-none"
+                style={{ minWidth: '200px' }}
+              >
+                <option value="all">Tüm Sayım Listeleri</option>
+                {countSessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {session.warehouses?.name || 'Sayım Listesi'} - {new Date(session.created_at).toLocaleDateString('tr-TR')}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <input
@@ -356,7 +509,24 @@ export default function MatchingPanel() {
                 <div
                   key={item.id}
                   className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all cursor-pointer"
-                  onClick={async () => {
+                  onClick={async (e) => {
+                    // Prevent event bubbling to avoid accidental clicks
+                    e.stopPropagation()
+                    
+                    // Check if item already has a match_result
+                    const { data: existingMatch } = await supabase
+                      .from('match_results')
+                      .select('id')
+                      .eq('count_item_id', item.id)
+                      .in('status', ['pending', 'matched'])
+                      .maybeSingle()
+
+                    if (existingMatch) {
+                      // Item already has a match, don't create duplicate
+                      console.log('Item already has a match result')
+                      return
+                    }
+
                     // Move item to "Eşleştiriliyor" by creating a match_result with status='pending'
                     try {
                       const { error } = await supabase
@@ -371,7 +541,13 @@ export default function MatchingPanel() {
                       
                       if (error) {
                         console.error('Error moving item to matching:', error)
-                        alert('Ürün eşleştiriliyor alanına taşınırken hata oluştu')
+                        // Check if it's a duplicate key error (item already in matching)
+                        if (error.code === '23505' || error.message?.includes('duplicate')) {
+                          // Item is already in matching, just reload
+                          loadData()
+                        } else {
+                          alert('Ürün eşleştiriliyor alanına taşınırken hata oluştu')
+                        }
                       } else {
                         // Reload data to show the item in "Eşleştiriliyor" area
                         loadData()
