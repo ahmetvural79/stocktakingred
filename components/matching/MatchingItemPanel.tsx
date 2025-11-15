@@ -75,6 +75,73 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const supabase = createClient()
+  
+  // Quantity calculation inputs: palet × kutu × adet
+  const [quantityInputs, setQuantityInputs] = useState<{
+    palet: string
+    kutu: string
+    adet: string
+  }>({
+    palet: '',
+    kutu: '',
+    adet: match.count_items.quantity.toString(),
+  })
+
+  // Calculate total quantity from inputs
+  const calculateTotalQuantity = useMemo(() => {
+    const palet = quantityInputs.palet ? parseInt(quantityInputs.palet, 10) : 0
+    const kutu = quantityInputs.kutu ? parseInt(quantityInputs.kutu, 10) : 0
+    const adet = quantityInputs.adet ? parseInt(quantityInputs.adet, 10) : 0
+    
+    // If only adet is provided (no palet, no kutu), use it directly
+    if (!palet && !kutu && adet > 0) {
+      return adet
+    }
+    
+    // If palet, kutu, and adet are all provided: palet × kutu × adet
+    if (palet > 0 && kutu > 0 && adet > 0) {
+      return palet * kutu * adet
+    }
+    
+    // If only kutu and adet are provided: kutu × adet
+    if (!palet && kutu > 0 && adet > 0) {
+      return kutu * adet
+    }
+    
+    // If only palet and adet are provided: palet × adet
+    if (palet > 0 && !kutu && adet > 0) {
+      return palet * adet
+    }
+    
+    // If only palet is provided: palet (treat as quantity)
+    if (palet > 0 && !kutu && !adet) {
+      return palet
+    }
+    
+    // If only kutu is provided: kutu (treat as quantity)
+    if (!palet && kutu > 0 && !adet) {
+      return kutu
+    }
+    
+    // Default: return adet or 0
+    return adet
+  }, [quantityInputs])
+
+  // Handle quantity input changes
+  const handleQuantityInputChange = (field: 'palet' | 'kutu' | 'adet', value: string) => {
+    // Only allow numbers
+    if (value && !/^\d+$/.test(value)) return
+    
+    setQuantityInputs((prev) => {
+      const updated = { ...prev, [field]: value }
+      
+      // If kutu is entered and palet is empty, show palet input
+      // If palet is entered, show kutu input
+      // Logic: when a field is filled, enable the next one
+      
+      return updated
+    })
+  }
 
   // Load ERP items from latest import, sorted by import date
   const loadERPItems = useCallback(async () => {
@@ -147,6 +214,15 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
     }
     initialize()
   }, [match.erp_item_id, match.erp_items, loadERPItems])
+
+  // Update quantity inputs when match changes
+  useEffect(() => {
+    setQuantityInputs({
+      palet: '',
+      kutu: '',
+      adet: match.count_items.quantity.toString(),
+    })
+  }, [match.count_items.quantity, match.id])
 
   // Real-time search with debounce
   const filteredItems = useMemo(() => {
@@ -304,6 +380,14 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
     try {
       setMatching(true)
       
+      // Use calculated quantity from inputs
+      const calculatedQuantity = calculateTotalQuantity
+      
+      if (calculatedQuantity <= 0) {
+        alert('Geçerli bir adet giriniz')
+        return
+      }
+      
       // Use manual stock quantity if provided, otherwise use item's stock_qty
       const stockQty = manualStockQty ? parseInt(manualStockQty, 10) : selectedItem.stock_qty
       
@@ -312,12 +396,27 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
         return
       }
 
+      // Update count_items quantity first
+      const { error: updateCountItemError } = await supabase
+        .from('count_items')
+        .update({
+          quantity: calculatedQuantity,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', match.count_item_id)
+
+      if (updateCountItemError) {
+        console.error('Error updating count item quantity:', updateCountItemError)
+        // Continue anyway, but log the error
+      }
+
+      // Update match result
       const { error } = await supabase
         .from('match_results')
         .update({
           erp_item_id: selectedItem.id,
           matched_score: 1.0,
-          difference: match.count_items.quantity - stockQty,
+          difference: calculatedQuantity - stockQty,
           status: 'matched',
           matched_at: new Date().toISOString(),
         })
@@ -350,9 +449,63 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
       )}
       <div className="space-y-2 mb-4">
         <div className="flex items-center justify-between">
-          <p className="font-semibold text-gray-900 text-base">
-            Adet: {match.count_items.quantity} {match.count_items.quantity_unit}
-          </p>
+          <div className="flex-1">
+            <p className="font-semibold text-gray-900 text-base mb-2">
+              Toplam Adet: <span className="text-red-600">{calculateTotalQuantity}</span> {match.count_items.quantity_unit}
+            </p>
+            
+            {/* Quantity Input Fields */}
+            <div className="flex items-center gap-2 flex-wrap mt-3 bg-gray-50 p-2 rounded-lg">
+              {/* Palet Input - shown when kutu is filled or always visible */}
+              <div className="flex items-center gap-1">
+                <label className="text-xs text-gray-600 whitespace-nowrap">Palet:</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={quantityInputs.palet}
+                  onChange={(e) => handleQuantityInputChange('palet', e.target.value)}
+                  placeholder="0"
+                  className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-white"
+                />
+              </div>
+              
+              {/* Kutu Input - shown when adet is filled or always visible */}
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-400">×</span>
+                <label className="text-xs text-gray-600 whitespace-nowrap">Kutu:</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={quantityInputs.kutu}
+                  onChange={(e) => handleQuantityInputChange('kutu', e.target.value)}
+                  placeholder="0"
+                  className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-white"
+                />
+              </div>
+              
+              {/* Adet Input - always visible */}
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-400">×</span>
+                <label className="text-xs text-gray-600 whitespace-nowrap">Adet:</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={quantityInputs.adet}
+                  onChange={(e) => handleQuantityInputChange('adet', e.target.value)}
+                  placeholder="0"
+                  className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-white"
+                />
+              </div>
+              
+              {/* Calculation Display - show when multiple inputs are used */}
+              {((quantityInputs.palet && parseInt(quantityInputs.palet, 10) > 0) || 
+                (quantityInputs.kutu && parseInt(quantityInputs.kutu, 10) > 0)) && (
+                <div className="text-xs text-gray-500 ml-2 font-semibold">
+                  = {calculateTotalQuantity}
+                </div>
+              )}
+            </div>
+          </div>
           <div className="flex items-center space-x-2">
             {/* Audio Button */}
             {match.count_items.audio_url && (
