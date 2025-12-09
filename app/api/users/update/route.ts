@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     // Check if target user exists and belongs to same company
     const { data: targetUser, error: targetError } = await supabase
       .from('users')
-      .select('id, company_id')
+      .select('id, company_id, email')
       .eq('id', userId)
       .single()
 
@@ -136,4 +136,5 @@ export async function POST(request: Request) {
     )
   }
 }
+
 
