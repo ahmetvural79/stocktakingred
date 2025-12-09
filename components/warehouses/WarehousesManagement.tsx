@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Warehouse, ChevronRight } from 'lucide-react'
+import { Plus, Warehouse, ChevronRight, Trash2, X } from 'lucide-react'
 import Link from 'next/link'
 
 interface CompanyData {
@@ -36,6 +36,9 @@ export default function WarehousesManagement() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [companies, setCompanies] = useState<CompanyData[]>([])
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [warehouseToDelete, setWarehouseToDelete] = useState<WarehouseData | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const supabase = createClient()
 
   const selectedCompany = useMemo(
@@ -214,6 +217,99 @@ export default function WarehousesManagement() {
     }
   }
 
+  const handleDeleteWarehouse = (warehouse: WarehouseData) => {
+    console.log('Delete warehouse clicked:', warehouse)
+    setWarehouseToDelete(warehouse)
+    setShowDeleteModal(true)
+  }
+
+  const confirmDeleteWarehouse = async () => {
+    if (!warehouseToDelete) {
+      console.error('No warehouse selected for deletion')
+      return
+    }
+
+    console.log('Confirming deletion of warehouse:', warehouseToDelete.id)
+    setDeleting(true)
+    
+    try {
+      // Check if warehouse has related data
+      // 1. Check for corridors
+      const { data: corridors, error: corridorsError } = await supabase
+        .from('corridors')
+        .select('id')
+        .eq('warehouse_id', warehouseToDelete.id)
+        .limit(1)
+
+      if (corridorsError) {
+        console.error('Corridors check error:', corridorsError)
+        throw new Error(`Koridor kontrolü yapılamadı: ${corridorsError.message}`)
+      }
+
+      if (corridors && corridors.length > 0) {
+        alert('Bu depoda koridorlar bulunmaktadır. Önce koridorları silmeniz gerekmektedir.')
+        setDeleting(false)
+        setShowDeleteModal(false)
+        setWarehouseToDelete(null)
+        return
+      }
+
+      // 2. Check for count sessions
+      const { data: countSessions, error: sessionsError } = await supabase
+        .from('count_sessions')
+        .select('id')
+        .eq('warehouse_id', warehouseToDelete.id)
+        .limit(1)
+
+      if (sessionsError) {
+        console.error('Count sessions check error:', sessionsError)
+        throw new Error(`Sayım oturumu kontrolü yapılamadı: ${sessionsError.message}`)
+      }
+
+      if (countSessions && countSessions.length > 0) {
+        alert('Bu depoda sayım oturumları bulunmaktadır. Depo silinemez.')
+        setDeleting(false)
+        setShowDeleteModal(false)
+        setWarehouseToDelete(null)
+        return
+      }
+
+      console.log('Deleting warehouse:', warehouseToDelete.id)
+      
+      // Delete warehouse
+      const { error: deleteError } = await supabase
+        .from('warehouses')
+        .delete()
+        .eq('id', warehouseToDelete.id)
+
+      if (deleteError) {
+        console.error('Delete error:', deleteError)
+        throw new Error(`Depo silinemedi: ${deleteError.message}`)
+      }
+
+      console.log('Warehouse deleted successfully')
+
+      // Reload warehouses
+      const targetCompanyId =
+        currentUser?.role === 'main_admin' ? selectedCompanyId : currentUser?.company_id
+      
+      if (targetCompanyId) {
+        await loadWarehousesForCompany(targetCompanyId)
+      } else {
+        // Fallback: reload current warehouses
+        setWarehouses((prev) => prev.filter((w) => w.id !== warehouseToDelete.id))
+      }
+
+      setShowDeleteModal(false)
+      setWarehouseToDelete(null)
+    } catch (error: any) {
+      console.error('Error deleting warehouse:', error)
+      alert(error.message || 'Depo silinirken hata oluştu. Lütfen tekrar deneyin.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const isMainAdmin = currentUser?.role === 'main_admin'
   const canManageWarehouses = !isMainAdmin || Boolean(selectedCompanyId)
 
@@ -221,13 +317,13 @@ export default function WarehousesManagement() {
     <div className="p-6">
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900">Depo Yönetimi</h2>
-            <p className="mt-2 text-gray-600">Depoları, koridorları ve rafları yönetin.</p>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Depo Yönetimi</h2>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">Depoları, koridorları ve rafları yönetin.</p>
           </div>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:space-x-3">
             {isMainAdmin && (
               <div className="flex items-center space-x-3">
-                <label className="text-sm font-medium text-gray-700" htmlFor="company-selector">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="company-selector">
                   Firma
                 </label>
                 <select
@@ -237,7 +333,7 @@ export default function WarehousesManagement() {
                     const value = event.target.value
                     setSelectedCompanyId(value ? value : null)
                   }}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
                 >
                   <option value="">Firma Seçin</option>
                   {companies.map((company) => (
@@ -248,7 +344,7 @@ export default function WarehousesManagement() {
                 </select>
                 <Link
                   href="/dashboard/admin/companies"
-                  className="text-sm text-blue-600 hover:text-blue-800"
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
                 >
                   Firma Yönetimi
                 </Link>
@@ -262,7 +358,7 @@ export default function WarehousesManagement() {
                 }
                 setShowAddModal(true)
               }}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 dark:hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
             >
               <Plus className="h-5 w-5" />
               <span>Yeni Depo</span>
@@ -271,7 +367,7 @@ export default function WarehousesManagement() {
         </div>
 
         {isMainAdmin && !selectedCompanyId && (
-          <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+          <div className="mb-4 rounded-lg border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/30 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-200">
             Lütfen depoları görüntülemek veya eklemek için bir firma seçin.
           </div>
         )}
@@ -280,9 +376,9 @@ export default function WarehousesManagement() {
         {loading ? (
           <div className="py-12 text-center">Yükleniyor...</div>
         ) : warehouses.length === 0 ? (
-          <div className="bg-white rounded-lg p-12 text-center shadow">
-            <Warehouse className="mx-auto mb-4 h-12 w-12 text-gray-400" />
-            <p className="mb-4 text-gray-500">Henüz depo eklenmemiş.</p>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-12 text-center shadow-sm">
+            <Warehouse className="mx-auto mb-4 h-12 w-12 text-gray-400 dark:text-gray-500" />
+            <p className="mb-4 text-gray-500 dark:text-gray-400">Henüz depo eklenmemiş.</p>
             <button
               disabled={!canManageWarehouses}
               onClick={() => {
@@ -291,7 +387,7 @@ export default function WarehousesManagement() {
                 }
                 setShowAddModal(true)
               }}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
             >
               İlk Depoyu Ekle
             </button>
@@ -299,69 +395,86 @@ export default function WarehousesManagement() {
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {warehouses.map((warehouse) => (
-              <Link
+              <div
                 key={warehouse.id}
-                href={`/dashboard/warehouses/${warehouse.id}`}
-                className="rounded-lg bg-white p-6 shadow transition-shadow hover:shadow-lg"
+                className="relative rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6 shadow-sm transition-shadow hover:shadow-md"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="mb-2 flex items-center space-x-2">
-                      <Warehouse className="h-5 w-5 text-red-600" />
-                      <h3 className="text-lg font-medium text-gray-900">{warehouse.name}</h3>
+                <Link
+                  href={`/dashboard/warehouses/${warehouse.id}`}
+                  className="block"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 pr-8">
+                      <div className="mb-2 flex items-center space-x-2">
+                        <Warehouse className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">{warehouse.name}</h3>
+                      </div>
+                      <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
+                        Firma: {warehouse.company_name || 'Bilinmiyor'}
+                      </p>
+                      {warehouse.description && (
+                        <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">{warehouse.description}</p>
+                      )}
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Oluşturulma: {new Date(warehouse.created_at).toLocaleDateString('tr-TR')}
+                      </p>
                     </div>
-                    <p className="mb-1 text-sm text-gray-500">
-                      Firma: {warehouse.company_name || 'Bilinmiyor'}
-                    </p>
-                    {warehouse.description && (
-                      <p className="mb-4 text-sm text-gray-600">{warehouse.description}</p>
-                    )}
-                    <p className="text-xs text-gray-500">
-                      Oluşturulma: {new Date(warehouse.created_at).toLocaleDateString('tr-TR')}
-                    </p>
+                    <ChevronRight className="h-5 w-5 text-gray-400 dark:text-gray-500 flex-shrink-0 mt-1" />
                   </div>
-                  <ChevronRight className="h-5 w-5 text-gray-400" />
-                </div>
-              </Link>
+                </Link>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    console.log('Delete button clicked for warehouse:', warehouse.id)
+                    handleDeleteWarehouse(warehouse)
+                  }}
+                  className="absolute bottom-3 right-3 z-20 rounded-lg bg-red-50 dark:bg-red-900/30 p-2 text-red-600 dark:text-red-400 shadow-sm transition-all hover:bg-red-100 dark:hover:bg-red-900/50 hover:shadow-md active:bg-red-200 dark:active:bg-red-900/40"
+                  title="Depoyu Sil"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             ))}
           </div>
         )}
 
       {/* Add Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6">
-            <h3 className="mb-4 text-xl font-bold">Yeni Depo Ekle</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70">
+          <div className="mx-4 w-full max-w-md rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl">
+            <h3 className="mb-4 text-xl font-bold text-gray-900 dark:text-gray-100">Yeni Depo Ekle</h3>
             <div className="space-y-4">
               {isMainAdmin && (
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Firma *</label>
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Firma *</label>
                   <input
                     type="text"
                     value={selectedCompany?.name ?? 'Firma seçilmedi'}
                     readOnly
-                    className="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700 focus:outline-none"
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm font-medium text-gray-800 dark:text-white focus:outline-none"
                   />
                 </div>
               )}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Depo Adı *
                 </label>
                 <input
                   type="text"
                   value={newWarehouseName}
                   onChange={(event) => setNewWarehouseName(event.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 font-medium text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
                   placeholder="Örn: Ana Depo"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Açıklama</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Açıklama</label>
                 <textarea
                   value={newWarehouseDesc}
                   onChange={(event) => setNewWarehouseDesc(event.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 font-medium text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
                   rows={3}
                   placeholder="Opsiyonel açıklama"
                 />
@@ -374,15 +487,67 @@ export default function WarehousesManagement() {
                   setNewWarehouseName('')
                   setNewWarehouseDesc('')
                 }}
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50"
+                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
               >
                 İptal
               </button>
               <button
                 onClick={handleAddWarehouse}
-                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+                className="flex-1 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2 text-white hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
               >
                 Ekle
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && warehouseToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70">
+          <div className="mx-4 w-full max-w-md rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-red-600 dark:text-red-400">Depo Sil</h3>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setWarehouseToDelete(null)
+                }}
+                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-700 dark:text-gray-200 mb-2">
+                <strong className="text-gray-900 dark:text-gray-100">"{warehouseToDelete.name}"</strong> deposunu silmek istediğinize emin misiniz?
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Bu işlem geri alınamaz. Depo ile birlikte tüm koridorlar ve raflar silinecektir.
+              </p>
+              <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                ⚠️ Eğer bu depoda sayım oturumları varsa, depo silinemez.
+              </p>
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setWarehouseToDelete(null)
+                }}
+                disabled={deleting}
+                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
+              >
+                İptal
+              </button>
+              <button
+                onClick={confirmDeleteWarehouse}
+                disabled={deleting}
+                className="flex-1 rounded-lg bg-red-600 dark:bg-red-500 px-4 py-2 text-white hover:bg-red-700 dark:hover:bg-red-600 disabled:opacity-50 transition-colors"
+              >
+                {deleting ? 'Siliniyor...' : 'Sil'}
               </button>
             </div>
           </div>

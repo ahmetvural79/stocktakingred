@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 /**
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
       )
     }
 
-    if (currentUserData.role !== 'admin') {
+    if (currentUserData.role !== 'admin' && currentUserData.role !== 'main_admin') {
       return NextResponse.json(
         { error: 'Sadece admin kullanıcılar yeni kullanıcı ekleyebilir' },
         { status: 403 }
@@ -62,37 +63,103 @@ export async function POST(request: Request) {
       )
     }
 
-    const validRoles = ['admin', 'user']
+    const validRoles = ['admin', 'manager', 'user']
     const userRole = role && validRoles.includes(role) ? role : 'user'
 
-    // Create auth user (requires service role key in environment)
-    // Note: This uses admin API which requires SUPABASE_SERVICE_ROLE_KEY
-    const createUserResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-          apikey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          email_confirm: true,
-          user_metadata: {
-            full_name: fullName,
-          },
-        }),
-      }
-    )
-
-    if (!createUserResponse.ok) {
-      const errorData = await createUserResponse.json()
-      throw new Error(errorData.message || 'Kullanıcı oluşturulamadı')
+    // Create auth user using Admin Client
+    let adminClient
+    try {
+      adminClient = createAdminClient()
+    } catch (adminError: any) {
+      console.error('[Add User] Admin client creation error:', adminError)
+      return NextResponse.json(
+        { error: 'Sunucu yapılandırma hatası: ' + adminError.message },
+        { status: 500 }
+      )
     }
 
-    const { user: newAuthUser } = await createUserResponse.json()
+    // Create auth user
+    const { data: authData, error: createAuthError } = await adminClient.auth.admin.createUser({
+      email: email.toLowerCase().trim(),
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName.trim(),
+      },
+    })
+
+    if (createAuthError) {
+      console.error('[Add User] Auth creation error:', createAuthError)
+      
+      // Check if user already exists
+      if (createAuthError.code === 'email_exists' || createAuthError.status === 422) {
+        // Check if user exists in our users table
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('id, email, full_name')
+          .eq('email', email.toLowerCase().trim())
+          .maybeSingle()
+        
+        if (existingUser) {
+          return NextResponse.json(
+            { error: 'Bu email adresi ile zaten bir kullanıcı kayıtlı' },
+            { status: 409 }
+          )
+        } else {
+          // User exists in auth but not in users table - try to get auth user and add to users table
+          try {
+            const { data: authUsers } = await adminClient.auth.admin.listUsers()
+            const existingAuthUser = authUsers.users.find(u => u.email === email.toLowerCase().trim())
+            
+            if (existingAuthUser) {
+              // Add to users table
+              const { error: insertError } = await supabase.from('users').insert({
+                id: existingAuthUser.id,
+                company_id: currentUserData.company_id,
+                full_name: fullName.trim(),
+                email: email.toLowerCase().trim(),
+                role: userRole,
+              })
+              
+              if (insertError) {
+                return NextResponse.json(
+                  { error: 'Kullanıcı auth sisteminde mevcut ancak veritabanına eklenemedi' },
+                  { status: 500 }
+                )
+              }
+              
+              return NextResponse.json({
+                success: true,
+                message: 'Kullanıcı başarıyla eklendi (mevcut auth kullanıcısı)',
+                user: {
+                  id: existingAuthUser.id,
+                  email: email,
+                  fullName: fullName,
+                  role: userRole,
+                },
+              })
+            }
+          } catch (lookupError) {
+            console.error('[Add User] Error looking up existing user:', lookupError)
+          }
+        }
+      }
+      
+      return NextResponse.json(
+        { error: createAuthError.message || 'Kullanıcı oluşturulamadı' },
+        { status: 400 }
+      )
+    }
+
+    if (!authData || !authData.user || !authData.user.id) {
+      console.error('[Add User] Invalid auth response:', authData)
+      return NextResponse.json(
+        { error: 'Kullanıcı oluşturuldu ancak geçersiz yanıt alındı' },
+        { status: 500 }
+      )
+    }
+
+    const newAuthUser = authData.user
 
     // Create user record in database
     const { error: insertError } = await supabase.from('users').insert({
@@ -105,16 +172,11 @@ export async function POST(request: Request) {
 
     if (insertError) {
       // Rollback: delete auth user if database insert fails
-      await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users/${newAuthUser.id}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-            apikey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-          },
-        }
-      )
+      try {
+        await adminClient.auth.admin.deleteUser(newAuthUser.id)
+      } catch (deleteError) {
+        console.error('[Add User] Failed to rollback auth user:', deleteError)
+      }
       throw insertError
     }
 
