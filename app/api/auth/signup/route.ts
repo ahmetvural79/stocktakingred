@@ -34,13 +34,24 @@ export async function POST(request: Request) {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 
+    console.log('[Signup] Environment check:', {
+      hasServiceRoleKey: !!serviceRoleKey,
+      hasSupabaseUrl: !!supabaseUrl,
+      serviceRoleKeyLength: serviceRoleKey?.length || 0,
+      supabaseUrlValue: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'missing',
+    })
+
     if (!serviceRoleKey || !supabaseUrl) {
       console.error('[Signup] Missing environment variables:', {
         hasServiceRoleKey: !!serviceRoleKey,
         hasSupabaseUrl: !!supabaseUrl,
+        allEnvKeys: Object.keys(process.env).filter(key => key.includes('SUPABASE')),
       })
       return NextResponse.json(
-        { error: 'Sunucu yapılandırma hatası. Lütfen yöneticiyle iletişime geçin.' },
+        { 
+          error: 'Sunucu yapılandırma hatası. Lütfen yöneticiyle iletişime geçin.',
+          details: 'Environment variables eksik veya yanlış yapılandırılmış.'
+        },
         { status: 500 }
       )
     }
@@ -48,30 +59,57 @@ export async function POST(request: Request) {
     let adminClient
     try {
       adminClient = createAdminClient()
+      console.log('[Signup] Admin client created successfully')
     } catch (clientError) {
-      console.error('[Signup] Failed to create admin client:', clientError)
+      console.error('[Signup] Failed to create admin client:', {
+        error: clientError,
+        message: clientError instanceof Error ? clientError.message : 'Unknown error',
+        stack: clientError instanceof Error ? clientError.stack : undefined,
+      })
       return NextResponse.json(
-        { error: 'Sunucu yapılandırma hatası. Lütfen yöneticiyle iletişime geçin.' },
+        { 
+          error: 'Sunucu yapılandırma hatası. Lütfen yöneticiyle iletişime geçin.',
+          details: clientError instanceof Error ? clientError.message : 'Admin client oluşturulamadı'
+        },
         { status: 500 }
       )
     }
 
     // 1. Create auth user
-    const { data: createdUser, error: createUserError } = await adminClient.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: fullName,
-        company_name: companyName,
-      },
-    })
+    console.log('[Signup] Attempting to create auth user:', { email, hasPassword: !!password })
+    
+    let createdUser, createUserError
+    try {
+      const result = await adminClient.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: fullName,
+          company_name: companyName,
+        },
+      })
+      createdUser = result.data
+      createUserError = result.error
+    } catch (authError) {
+      console.error('[Signup] Exception during createUser:', {
+        error: authError,
+        message: authError instanceof Error ? authError.message : 'Unknown error',
+        stack: authError instanceof Error ? authError.stack : undefined,
+      })
+      createUserError = authError instanceof Error ? {
+        message: authError.message,
+        status: 500,
+        name: authError.name,
+      } : { message: 'Unknown error', status: 500, name: 'Error' }
+    }
 
     if (createUserError) {
       console.error('[Signup] Create user error:', {
         message: createUserError.message,
         status: createUserError.status,
         name: createUserError.name,
+        fullError: createUserError,
       })
 
       // Handle specific error cases
@@ -88,12 +126,20 @@ export async function POST(request: Request) {
         errorMessage.includes('invalid api key') ||
         errorMessage.includes('invalid key') ||
         errorMessage.includes('api key') ||
+        errorMessage.includes('jwt') ||
+        errorMessage.includes('unauthorized') ||
         createUserError.status === 401 ||
         createUserError.status === 403
       ) {
-        console.error('[Signup] API key validation failed')
+        console.error('[Signup] API key validation failed:', {
+          errorMessage,
+          status: createUserError.status,
+        })
         return NextResponse.json(
-          { error: 'Sunucu kimlik doğrulama hatası. Lütfen yöneticiyle iletişime geçin.' },
+          { 
+            error: 'Sunucu kimlik doğrulama hatası. Lütfen yöneticiyle iletişime geçin.',
+            details: `API key hatası: ${createUserError.message}`
+          },
           { status: 500 }
         )
       }
@@ -220,7 +266,12 @@ export async function POST(request: Request) {
       message: 'Firma kaydı ve kullanıcı oluşturuldu.',
     })
   } catch (error: unknown) {
-    console.error('[Signup] Unexpected error:', error)
+    console.error('[Signup] Unexpected error:', {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      type: error instanceof Error ? error.constructor.name : typeof error,
+    })
     
     // Handle specific error types
     if (error instanceof Error) {
@@ -232,22 +283,33 @@ export async function POST(request: Request) {
         errorMessage.includes('invalid key') ||
         errorMessage.includes('api key') ||
         errorMessage.includes('service role') ||
-        errorMessage.includes('environment variables')
+        errorMessage.includes('environment variables') ||
+        errorMessage.includes('jwt') ||
+        errorMessage.includes('unauthorized')
       ) {
         return NextResponse.json(
-          { error: 'Sunucu kimlik doğrulama hatası. Lütfen yöneticiyle iletişime geçin.' },
+          { 
+            error: 'Sunucu kimlik doğrulama hatası. Lütfen yöneticiyle iletişime geçin.',
+            details: error.message
+          },
           { status: 500 }
         )
       }
       
       return NextResponse.json(
-        { error: `Kayıt işlemi başarısız oldu: ${error.message}` },
+        { 
+          error: `Kayıt işlemi başarısız oldu: ${error.message}`,
+          details: error.stack
+        },
         { status: 500 }
       )
     }
     
     return NextResponse.json(
-      { error: 'Kayıt işlemi başarısız oldu. Lütfen tekrar deneyin.' },
+      { 
+        error: 'Kayıt işlemi başarısız oldu. Lütfen tekrar deneyin.',
+        details: 'Beklenmeyen hata oluştu'
+      },
       { status: 500 }
     )
   }
