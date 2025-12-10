@@ -470,7 +470,7 @@ export default function MatchingPanel() {
               <select
                 value={selectedSessionId}
                 onChange={(e) => setSelectedSessionId(e.target.value)}
-                className="pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 bg-white text-gray-700 font-medium cursor-pointer appearance-none"
+                className="pl-4 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium cursor-pointer appearance-none"
                 style={{ minWidth: '200px' }}
               >
                 <option value="all">Tüm Sayım Listeleri</option>
@@ -520,10 +520,10 @@ export default function MatchingPanel() {
         {/* Columns */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Column 1: Pending Matching */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Eşleştirme Bekleyenler</h3>
-              <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Eşleştirme Bekleyenler</h3>
+              <span className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-3 py-1 rounded-full text-sm font-semibold">
                 {pendingItems.length}
               </span>
             </div>
@@ -531,10 +531,10 @@ export default function MatchingPanel() {
               {pendingItems.map((item, index) => (
                 <div
                   key={item.id}
-                  className={`bg-white border rounded-xl p-4 transition-all ${
+                  className={`bg-white dark:bg-gray-800 border rounded-xl p-4 transition-all ${
                     index === 0
-                      ? 'border-red-500 border-2 shadow-md ring-2 ring-red-200 cursor-pointer hover:shadow-lg'
-                      : 'border-gray-200 cursor-not-allowed opacity-60'
+                      ? 'border-red-500 dark:border-red-400 border-2 shadow-md ring-2 ring-red-200 dark:ring-red-900/30 cursor-pointer hover:shadow-lg'
+                      : 'border-gray-200 dark:border-gray-700 cursor-not-allowed opacity-60'
                   }`}
                   onClick={async (e) => {
                     // Prevent event bubbling to avoid accidental clicks
@@ -617,24 +617,24 @@ export default function MatchingPanel() {
                         Sıradaki İlk Ürün (FIFO)
                       </div>
                     )}
-                    <p className="font-semibold text-gray-900 text-base">
+                    <p className="font-semibold text-gray-900 dark:text-white text-base">
                       Adet: {item.quantity}
                     </p>
-                    <p className="text-sm text-gray-600">Raf: {getShelfLocation(item)}</p>
-                    <p className="text-sm text-gray-600">Sayıcı: {getCounterName(item)}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Raf: {getShelfLocation(item)}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Sayıcı: {getCounterName(item)}</p>
                   </div>
-                  <div className="mt-4 flex items-center space-x-3 pt-3 border-t border-gray-100">
-                    <button className="text-gray-500 hover:text-gray-700 transition-colors">
+                  <div className="mt-4 flex items-center space-x-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                    <button className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
                       <Mic className="h-5 w-5" />
                     </button>
-                    <button className="text-gray-500 hover:text-gray-700 transition-colors">
+                    <button className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
                       <FileText className="h-5 w-5" />
                     </button>
                   </div>
                 </div>
               ))}
               {pendingItems.length === 0 && (
-                <div className="text-center py-12 text-gray-400">
+                <div className="text-center py-12 text-gray-400 dark:text-gray-500">
                   <p>Eşleştirme bekleyen ürün yok</p>
                 </div>
               )}
@@ -642,10 +642,10 @@ export default function MatchingPanel() {
           </div>
 
           {/* Column 2: Being Matched */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Eşleştiriliyor</h3>
-              <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Eşleştiriliyor</h3>
+              <span className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-3 py-1 rounded-full text-sm font-semibold">
                 {matchingItems.length}
               </span>
             </div>
@@ -664,19 +664,19 @@ export default function MatchingPanel() {
                 />
               ))}
               {matchingItems.length === 0 && (
-                <div className="text-center py-12 text-gray-400">
+                <div className="text-center py-12 text-gray-400 dark:text-gray-500">
                   <p>Eşleştiriliyor alanında ürün yok</p>
-                  <p className="text-sm mt-2">Bekleyenlerden bir ürün seçin</p>
+                  <p className="text-sm mt-2 dark:text-gray-400">Bekleyenlerden bir ürün seçin</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* Column 3: Matched */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Eşleştirildi</h3>
-              <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Eşleştirildi</h3>
+              <span className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-3 py-1 rounded-full text-sm font-semibold">
                 {matchedItems.length}
               </span>
             </div>
@@ -684,7 +684,7 @@ export default function MatchingPanel() {
               {matchedItems.map((match) => (
                 <div
                   key={match.id}
-                  className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all"
+                  className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:shadow-lg transition-all"
                 >
                   {match.count_items.photo_url && normalizeImageUrl(match.count_items.photo_url) && (
                     <div className="relative w-full h-40 mb-4 rounded-lg overflow-hidden bg-gray-100">

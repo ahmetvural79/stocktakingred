@@ -458,24 +458,24 @@ export default function CountSessionsList() {
         </div>
 
       {/* Sessions List */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="divide-y divide-gray-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden border border-gray-200 dark:border-gray-700">
+        <div className="divide-y divide-gray-200 dark:divide-gray-700">
           {sessions.map((session) => (
             <Link
               key={session.id}
               href={`/dashboard/count-sessions/${session.id}`}
-              className="block hover:bg-gray-50 transition-colors"
+              className="block hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
             >
               <div className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center space-x-3">
-                      <FileText className="h-5 w-5 text-gray-400" />
+                      <FileText className="h-5 w-5 text-gray-400 dark:text-gray-500" />
                       <div>
-                        <h3 className="text-lg font-medium text-gray-900">
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                           {session.warehouses.name}
                         </h3>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
                           {session.users?.full_name || 'Bilinmiyor'} •{' '}
                           {new Date(session.created_at).toLocaleDateString('tr-TR', {
                             year: 'numeric',
@@ -539,10 +539,10 @@ export default function CountSessionsList() {
 
       {/* Add Count Session Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-gray-900">Yeni Sayım Listesi</h3>
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 dark:bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Yeni Sayım Listesi</h3>
               <button
                 onClick={() => {
                   setShowAddModal(false)

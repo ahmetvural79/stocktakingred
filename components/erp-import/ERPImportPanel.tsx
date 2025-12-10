@@ -331,14 +331,14 @@ export default function ERPImportPanel() {
       </div>
 
         {/* Upload Section */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-            <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Excel Dosyası Yükle</h3>
-            <p className="text-sm text-gray-600 mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6 border border-gray-200 dark:border-gray-700">
+          <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
+            <Upload className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Excel Dosyası Yükle</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
               Desteklenen formatlar: .xlsx, .xls
             </p>
-            <p className="text-xs text-gray-500 mb-4">
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
               Gerekli kolonlar: product_code (Ürün Kodu), product_name (Ürün Adı), stock_qty
               (Stok Miktarı)
             </p>
@@ -385,13 +385,13 @@ export default function ERPImportPanel() {
         </div>
 
         {/* Imports List */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Import Geçmişi</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Import Geçmişi</h3>
           </div>
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {imports.map((importRecord) => (
-              <div key={importRecord.id} className="p-6 hover:bg-gray-50 transition-colors">
+              <div key={importRecord.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <FileText className="h-5 w-5 text-gray-400" />

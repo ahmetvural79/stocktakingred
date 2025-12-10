@@ -456,7 +456,7 @@ export default function BarcodingPanel() {
             <select
               value={selectedSessionId}
               onChange={(e) => setSelectedSessionId(e.target.value)}
-              className="pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 bg-white text-gray-700 font-medium cursor-pointer appearance-none"
+              className="pl-4 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium cursor-pointer appearance-none"
               style={{ minWidth: '200px' }}
             >
               <option value="all">Tüm Sayım Listeleri</option>
@@ -495,10 +495,10 @@ export default function BarcodingPanel() {
         {/* Columns */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Column 1: Pending */}
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Barkod Bekleyenler</h3>
-              <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-sm font-medium">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Barkod Bekleyenler</h3>
+              <span className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-1 rounded-full text-sm font-medium">
                 {pendingItems.length}
               </span>
             </div>
@@ -506,31 +506,31 @@ export default function BarcodingPanel() {
               {pendingItems.map((item) => (
                 <div
                   key={item.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow bg-white dark:bg-gray-800"
                 >
                   <div className="flex items-start space-x-3">
                     <input
                       type="checkbox"
                       checked={selectedItems.has(item.count_item_id)}
                       onChange={() => toggleSelection(item.count_item_id)}
-                      className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                      className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 dark:border-gray-600 rounded"
                     />
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900">
+                      <p className="font-medium text-gray-900 dark:text-white">
                         {item.count_items.product_name || 'Ürün'}
                       </p>
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
                         ERP Kod: {getProductCode(item)}
                       </p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
                         Adet: {item.count_items.quantity} {item.count_items.quantity_unit}
                       </p>
-                      <div className="flex items-center space-x-2 mt-2 text-sm text-gray-500">
+                      <div className="flex items-center space-x-2 mt-2 text-sm text-gray-600 dark:text-gray-400">
                         <Package className="h-4 w-4" />
                         <span>Raf: {getShelfLocation(item)}</span>
                       </div>
                       {item.matched_at && (
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           Eşleştirildi: {new Date(item.matched_at).toLocaleDateString('tr-TR')}
                         </p>
                       )}
@@ -539,7 +539,7 @@ export default function BarcodingPanel() {
                 </div>
               ))}
               {pendingItems.length === 0 && (
-                <div className="text-center py-12 text-gray-400">
+                <div className="text-center py-12 text-gray-400 dark:text-gray-500">
                   <p>Eşleştirilmiş ve barkod bekleyen ürün yok</p>
                 </div>
               )}
@@ -547,10 +547,10 @@ export default function BarcodingPanel() {
           </div>
 
           {/* Column 2: Printing */}
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Barkod Yazdırılıyor</h3>
-              <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-sm font-medium">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Barkod Yazdırılıyor</h3>
+              <span className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-1 rounded-full text-sm font-medium">
                 {printingItems.length}
               </span>
             </div>
@@ -558,20 +558,20 @@ export default function BarcodingPanel() {
               {printingItems.map((item) => (
                 <div
                   key={item.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow bg-white dark:bg-gray-800"
                 >
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-gray-900 dark:text-white">
                     {item.count_items.product_name || 'Ürün'}
                   </p>
-                  <p className="text-sm text-gray-600 mt-1">Kod: {getProductCode(item)}</p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Kod: {getProductCode(item)}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
                     Adet: {item.count_items.quantity} {item.count_items.quantity_unit}
                   </p>
-                  <div className="flex items-center space-x-2 mt-2 text-sm text-gray-500">
+                  <div className="flex items-center space-x-2 mt-2 text-sm text-gray-600 dark:text-gray-400">
                     <Package className="h-4 w-4" />
                     <span>Raf: {getShelfLocation(item)}</span>
                   </div>
-                  <div className="mt-3 flex items-center space-x-2 text-orange-600">
+                  <div className="mt-3 flex items-center space-x-2 text-orange-600 dark:text-orange-400">
                     <Printer className="h-4 w-4" />
                     <span className="text-xs font-medium">YAZDIRILIYOR</span>
                   </div>
@@ -581,10 +581,10 @@ export default function BarcodingPanel() {
           </div>
 
           {/* Column 3: Labeled */}
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Etiketlendi</h3>
-              <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-sm font-medium">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Etiketlendi</h3>
+              <span className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-1 rounded-full text-sm font-medium">
                 {labeledItems.length}
               </span>
             </div>

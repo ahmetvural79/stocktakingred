@@ -434,7 +434,7 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all">
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:shadow-lg transition-all">
       {/* Count Item Info */}
       {match.count_items.photo_url && normalizeImageUrl(match.count_items.photo_url) && (
         <div className="relative w-full h-40 mb-4 rounded-lg overflow-hidden bg-gray-100">
@@ -465,7 +465,7 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
                   value={quantityInputs.palet}
                   onChange={(e) => handleQuantityInputChange('palet', e.target.value)}
                   placeholder="0"
-                  className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-white"
+                  className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
               </div>
               
@@ -479,7 +479,7 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
                   value={quantityInputs.kutu}
                   onChange={(e) => handleQuantityInputChange('kutu', e.target.value)}
                   placeholder="0"
-                  className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-white"
+                  className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
               </div>
               
@@ -493,7 +493,7 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
                   value={quantityInputs.adet}
                   onChange={(e) => handleQuantityInputChange('adet', e.target.value)}
                   placeholder="0"
-                  className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-white"
+                  className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
               </div>
               
@@ -703,34 +703,34 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
 
       {/* ERP List Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">ERP Ürün Listesi</h3>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">ERP Ürün Listesi</h3>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             {/* Modal Search */}
-            <div className="p-4 border-b border-gray-200">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
                 <input
                   type="text"
                   placeholder="Ürün kodu veya adı ile ara..."
                   value={searchQuery}
                   onChange={(e) => handleSearchChange(e.target.value)}
-                  className="w-full pl-9 pr-10 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full pl-9 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => handleSearchChange('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -741,9 +741,9 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
             {/* Modal Content */}
             <div className="flex-1 overflow-y-auto p-4">
               {loading ? (
-                <div className="text-center py-8 text-gray-500">Yükleniyor...</div>
+                <div className="text-center py-8 text-gray-600 dark:text-gray-300">Yükleniyor...</div>
               ) : erpItems.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">Ürün bulunamadı</div>
+                <div className="text-center py-8 text-gray-600 dark:text-gray-300">Ürün bulunamadı</div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {erpItems
@@ -764,21 +764,21 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
                         }}
                         className={`p-3 border rounded-lg cursor-pointer transition-colors ${
                           selectedItem?.id === item.id
-                            ? 'border-red-500 bg-red-50'
-                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            ? 'border-red-500 dark:border-red-400 bg-red-50 dark:bg-red-900/30'
+                            : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 bg-white dark:bg-gray-800'
                         }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <p className="font-medium text-sm text-gray-900">{item.product_name}</p>
-                            <p className="text-xs text-gray-600 mt-1">Kod: {item.product_code}</p>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="font-medium text-sm text-gray-900 dark:text-white">{item.product_name}</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">Kod: {item.product_code}</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                               <Package className="inline h-3 w-3 mr-1" />
                               Stok: {item.stock_qty}
                             </p>
                           </div>
                           {selectedItem?.id === item.id && (
-                            <CheckCircle2 className="h-5 w-5 text-red-600 flex-shrink-0 ml-2" />
+                            <CheckCircle2 className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 ml-2" />
                           )}
                         </div>
                       </div>
@@ -788,10 +788,10 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-gray-200 flex items-center justify-end space-x-2">
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end space-x-2">
               <button
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
               >
                 Kapat
               </button>
@@ -802,17 +802,17 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
 
       {/* Note Modal */}
       {showNoteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center space-x-2">
-                <FileText className="h-5 w-5 text-gray-600" />
-                <h3 className="text-lg font-semibold text-gray-900">Not</h3>
+                <FileText className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Not</h3>
               </div>
               <button
                 onClick={() => setShowNoteModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -821,17 +821,17 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
             {/* Modal Content */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="prose max-w-none">
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
                   {match.count_items.note}
                 </p>
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-gray-200 flex items-center justify-end space-x-2">
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end space-x-2">
               <button
                 onClick={() => setShowNoteModal(false)}
-                className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
               >
                 Kapat
               </button>

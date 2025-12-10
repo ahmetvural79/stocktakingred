@@ -457,49 +457,49 @@ export default function CountSessionDetail({ sessionId }: CountSessionDetailProp
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-2">
-            <Package className="h-5 w-5 text-gray-400" />
+            <Package className="h-5 w-5 text-gray-400 dark:text-gray-500" />
             <div>
-              <p className="text-sm text-gray-500">Toplam Ürün</p>
-              <p className="text-2xl font-bold text-gray-900">{allItems.length}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Toplam Ürün</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{allItems.length}</p>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-2">
-            <CheckCircle2 className="h-5 w-5 text-green-500" />
+            <CheckCircle2 className="h-5 w-5 text-green-500 dark:text-green-400" />
             <div>
-              <p className="text-sm text-gray-500">Eşleştirilmiş</p>
-              <p className="text-2xl font-bold text-green-600">{matchedItems.length}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Eşleştirilmiş</p>
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">{matchedItems.length}</p>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-2">
-            <FileText className="h-5 w-5 text-yellow-500" />
+            <FileText className="h-5 w-5 text-yellow-500 dark:text-yellow-400" />
             <div>
-              <p className="text-sm text-gray-500">Bekleyen</p>
-              <p className="text-2xl font-bold text-yellow-600">{allItems.length - matchedItems.length}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Bekleyen</p>
+              <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{allItems.length - matchedItems.length}</p>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-2">
-            <FileText className="h-5 w-5 text-blue-500" />
+            <FileText className="h-5 w-5 text-blue-500 dark:text-blue-400" />
             <div>
-              <p className="text-sm text-gray-500">Durum</p>
-              <p className="text-lg font-medium text-gray-900">{getStatusText(session.status)}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Durum</p>
+              <p className="text-lg font-medium text-gray-900 dark:text-white">{getStatusText(session.status)}</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* All Items List */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Tüm Ürünler</h3>
-          <p className="text-sm text-gray-500 mt-1">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Tüm Ürünler</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
             Bu sayım listesindeki tüm ürünler. Eşleştirilmiş ürünler PDF veya Excel olarak export edilebilir.
           </p>
         </div>

@@ -314,16 +314,16 @@ export default function WarehousesManagement() {
   const canManageWarehouses = !isMainAdmin || Boolean(selectedCompanyId)
 
   return (
-    <div className="p-6">
+    <div className="p-6 bg-white dark:bg-gray-900 min-h-screen">
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Depo Yönetimi</h2>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">Depoları, koridorları ve rafları yönetin.</p>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Depo Yönetimi</h2>
+            <p className="mt-2 text-gray-700 dark:text-gray-300">Depoları, koridorları ve rafları yönetin.</p>
           </div>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:space-x-3">
             {isMainAdmin && (
               <div className="flex items-center space-x-3">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="company-selector">
+                <label className="text-sm font-semibold text-gray-900 dark:text-gray-100" htmlFor="company-selector">
                   Firma
                 </label>
                 <select
@@ -378,7 +378,7 @@ export default function WarehousesManagement() {
         ) : warehouses.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-12 text-center shadow-sm">
             <Warehouse className="mx-auto mb-4 h-12 w-12 text-gray-400 dark:text-gray-500" />
-            <p className="mb-4 text-gray-500 dark:text-gray-400">Henüz depo eklenmemiş.</p>
+            <p className="mb-4 text-gray-600 dark:text-gray-300">Henüz depo eklenmemiş.</p>
             <button
               disabled={!canManageWarehouses}
               onClick={() => {
@@ -407,15 +407,15 @@ export default function WarehousesManagement() {
                     <div className="flex-1 pr-8">
                       <div className="mb-2 flex items-center space-x-2">
                         <Warehouse className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">{warehouse.name}</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{warehouse.name}</h3>
                       </div>
-                      <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
+                      <p className="mb-1 text-sm text-gray-600 dark:text-gray-300">
                         Firma: {warehouse.company_name || 'Bilinmiyor'}
                       </p>
                       {warehouse.description && (
-                        <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">{warehouse.description}</p>
+                        <p className="mb-4 text-sm text-gray-700 dark:text-gray-300">{warehouse.description}</p>
                       )}
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
                         Oluşturulma: {new Date(warehouse.created_at).toLocaleDateString('tr-TR')}
                       </p>
                     </div>
@@ -444,11 +444,11 @@ export default function WarehousesManagement() {
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70">
           <div className="mx-4 w-full max-w-md rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl">
-            <h3 className="mb-4 text-xl font-bold text-gray-900 dark:text-gray-100">Yeni Depo Ekle</h3>
+            <h3 className="mb-4 text-xl font-bold text-gray-900 dark:text-white">Yeni Depo Ekle</h3>
             <div className="space-y-4">
               {isMainAdmin && (
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Firma *</label>
+                  <label className="mb-1 block text-sm font-semibold text-gray-900 dark:text-gray-100">Firma *</label>
                   <input
                     type="text"
                     value={selectedCompany?.name ?? 'Firma seçilmedi'}
@@ -458,7 +458,7 @@ export default function WarehousesManagement() {
                 </div>
               )}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="mb-1 block text-sm font-semibold text-gray-900 dark:text-gray-100">
                   Depo Adı *
                 </label>
                 <input
@@ -470,7 +470,7 @@ export default function WarehousesManagement() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Açıklama</label>
+                <label className="mb-1 block text-sm font-semibold text-gray-900 dark:text-gray-100">Açıklama</label>
                 <textarea
                   value={newWarehouseDesc}
                   onChange={(event) => setNewWarehouseDesc(event.target.value)}
@@ -521,9 +521,9 @@ export default function WarehousesManagement() {
 
             <div className="mb-6">
               <p className="text-gray-700 dark:text-gray-200 mb-2">
-                <strong className="text-gray-900 dark:text-gray-100">"{warehouseToDelete.name}"</strong> deposunu silmek istediğinize emin misiniz?
+                <strong className="text-gray-900 dark:text-white">"{warehouseToDelete.name}"</strong> deposunu silmek istediğinize emin misiniz?
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
                 Bu işlem geri alınamaz. Depo ile birlikte tüm koridorlar ve raflar silinecektir.
               </p>
               <p className="text-sm text-red-600 dark:text-red-400 mt-2">

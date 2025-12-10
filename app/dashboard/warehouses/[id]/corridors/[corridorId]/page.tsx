@@ -224,11 +224,11 @@ export default function CorridorDetailPage() {
 
         {/* Shelves List */}
         {shelves.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
-            <p className="text-gray-500 mb-4">Henüz raf eklenmemiş.</p>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center border border-gray-200 dark:border-gray-700">
+            <p className="text-gray-600 dark:text-gray-300 mb-4">Henüz raf eklenmemiş.</p>
             <button
               onClick={() => setShowAddShelfModal(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+              className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600"
             >
               İlk Rafı Ekle
             </button>
@@ -238,18 +238,18 @@ export default function CorridorDetailPage() {
             {shelves.map((shelf) => (
               <div
                 key={shelf.id}
-                className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
+                className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg transition-shadow border border-gray-200 dark:border-gray-700"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="text-lg font-medium text-gray-900">{shelf.name}</h3>
-                    <p className="text-xs text-gray-500 mt-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{shelf.name}</h3>
+                    <p className="text-xs text-gray-600 dark:text-gray-300 mt-2">
                       Oluşturulma: {new Date(shelf.created_at).toLocaleDateString('tr-TR')}
                     </p>
                   </div>
                   <button
                     onClick={() => handleDeleteShelf(shelf.id)}
-                    className="text-red-600 hover:text-red-900 ml-4"
+                    className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 ml-4"
                   >
                     <Trash2 className="h-5 w-5" />
                   </button>
@@ -262,19 +262,19 @@ export default function CorridorDetailPage() {
 
       {/* Add Shelf Modal */}
       {showAddShelfModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg max-w-md w-full mx-4 p-6">
-            <h3 className="text-xl font-bold mb-4">Yeni Raf Ekle</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full mx-4 p-6 border border-gray-200 dark:border-gray-700">
+            <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Yeni Raf Ekle</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
                   Raf Adı *
                 </label>
                 <input
                   type="text"
                   value={newShelfName}
                   onChange={(e) => setNewShelfName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400"
                   placeholder="Örn: Raf 1"
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
@@ -290,13 +290,13 @@ export default function CorridorDetailPage() {
                   setShowAddShelfModal(false)
                   setNewShelfName('')
                 }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800"
               >
                 İptal
               </button>
               <button
                 onClick={handleAddShelf}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                className="flex-1 px-4 py-2 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600"
               >
                 Ekle
               </button>

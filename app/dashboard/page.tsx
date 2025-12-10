@@ -161,11 +161,11 @@ export default async function DashboardPage() {
       companyName={companyName}
       userRole={userData.role}
     >
-      <div className="p-6">
+      <div className="p-6 bg-white dark:bg-gray-900 min-h-screen">
         {/* Header */}
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900">Dashboard</h2>
-          <p className="mt-2 text-gray-600">
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h2>
+          <p className="mt-2 text-gray-700 dark:text-gray-300">
             Depo sayım sistemine hoş geldiniz
           </p>
         </div>
@@ -178,20 +178,20 @@ export default async function DashboardPage() {
               <Link
                 key={stat.name}
                 href={stat.href}
-                className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-all border border-gray-100"
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 hover:shadow-md transition-all border border-gray-100 dark:border-gray-700"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className={`${stat.color} p-3 rounded-lg`}>
                     <Icon className="h-6 w-6 text-white" />
                   </div>
                   <span className={`text-xs font-medium ${
-                    stat.changeType === 'increase' ? 'text-green-600' : 'text-gray-500'
+                    stat.changeType === 'increase' ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'
                   }`}>
                     {stat.change}
                   </span>
                 </div>
-                <p className="text-sm font-medium text-gray-600 mb-1">{stat.name}</p>
-                <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">{stat.name}</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stat.value}</p>
               </Link>
             )
           })}
@@ -200,59 +200,59 @@ export default async function DashboardPage() {
         {/* Recent Activities */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Recent Sessions */}
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Son Sayım Listeleri</h3>
-              <Clock className="h-5 w-5 text-gray-400" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Son Sayım Listeleri</h3>
+              <Clock className="h-5 w-5 text-gray-400 dark:text-gray-500" />
             </div>
             <div className="space-y-3">
               {recentSessions && recentSessions.length > 0 ? (
                 recentSessions.map((session: any) => (
-                  <div key={session.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                  <div key={session.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
                         {session.warehouses?.name || 'Depo'}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-600 dark:text-gray-300">
                         {session.users?.full_name || 'Kullanıcı'} • {new Date(session.created_at).toLocaleDateString('tr-TR')}
                       </p>
                     </div>
                     <span className={`px-2 py-1 text-xs rounded-full ${
-                      session.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                      session.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
                     }`}>
                       {session.status}
                     </span>
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-gray-500 text-center py-4">Henüz sayım listesi yok</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300 text-center py-4">Henüz sayım listesi yok</p>
               )}
             </div>
           </div>
 
           {/* Recent Matches */}
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Son Eşleştirmeler</h3>
-              <TrendingUp className="h-5 w-5 text-gray-400" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Son Eşleştirmeler</h3>
+              <TrendingUp className="h-5 w-5 text-gray-400 dark:text-gray-500" />
             </div>
             <div className="space-y-3">
               {recentMatches && recentMatches.length > 0 ? (
                 recentMatches.map((match: any) => (
-                  <div key={match.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                  <div key={match.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                         {match.count_items?.product_name || 'Ürün'}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-600 dark:text-gray-300">
                         ERP: {match.erp_items?.product_code || 'N/A'}
                       </p>
                     </div>
-                    <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 ml-2" />
+                    <CheckCircle2 className="h-5 w-5 text-green-500 dark:text-green-400 flex-shrink-0 ml-2" />
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-gray-500 text-center py-4">Henüz eşleştirme yok</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300 text-center py-4">Henüz eşleştirme yok</p>
               )}
             </div>
           </div>

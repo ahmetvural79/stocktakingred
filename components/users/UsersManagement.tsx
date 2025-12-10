@@ -224,11 +224,11 @@ export default function UsersManagement() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 bg-white dark:bg-gray-900 min-h-screen">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Kullanıcı Yönetimi</h2>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">Firma kullanıcılarını yönetin.</p>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Kullanıcı Yönetimi</h2>
+            <p className="mt-2 text-gray-700 dark:text-gray-300">Firma kullanıcılarını yönetin.</p>
           </div>
           <button
             onClick={handleAddUser}
@@ -242,13 +242,13 @@ export default function UsersManagement() {
         {/* Search */}
         <div className="mb-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-5 w-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 h-5 w-5" />
             <input
               type="text"
               placeholder="Kullanıcı ara..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 font-medium text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 font-medium text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400"
             />
           </div>
         </div>
@@ -256,31 +256,31 @@ export default function UsersManagement() {
         {/* Users Table */}
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
                   Kullanıcı
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
                   Rol
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
                   Kayıt Tarihi
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
                   İşlemler
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
                         {user.full_name || 'İsimsiz'}
                       </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{user.email}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-300">{user.email}</div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -296,7 +296,7 @@ export default function UsersManagement() {
                       <option value="admin">Admin</option>
                     </select>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                     {new Date(user.created_at).toLocaleDateString('tr-TR')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -332,7 +332,7 @@ export default function UsersManagement() {
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Yeni Kullanıcı Ekle</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Yeni Kullanıcı Ekle</h3>
               <button
                 onClick={() => setShowAddModal(false)}
                 className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -343,7 +343,7 @@ export default function UsersManagement() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
                   Ad Soyad *
                 </label>
                 <input
@@ -356,7 +356,7 @@ export default function UsersManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
                   Email *
                 </label>
                 <input
@@ -369,7 +369,7 @@ export default function UsersManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
                   Şifre * (Min. 6 karakter)
                 </label>
                 <input
@@ -382,7 +382,7 @@ export default function UsersManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
                   Rol
                 </label>
                 <select
@@ -421,7 +421,7 @@ export default function UsersManagement() {
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Kullanıcı Düzenle</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Kullanıcı Düzenle</h3>
               <button
                 onClick={() => setShowEditModal(false)}
                 className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -432,7 +432,7 @@ export default function UsersManagement() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
                   Ad Soyad *
                 </label>
                 <input
@@ -445,7 +445,7 @@ export default function UsersManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
                   Email *
                 </label>
                 <input
@@ -458,7 +458,7 @@ export default function UsersManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
                   Rol
                 </label>
                 <select
@@ -508,9 +508,9 @@ export default function UsersManagement() {
 
             <div className="mb-6">
               <p className="text-gray-700 dark:text-gray-200 mb-2">
-                <strong className="text-gray-900 dark:text-gray-100">{selectedUser.full_name || selectedUser.email}</strong> kullanıcısını silmek istediğinize emin misiniz?
+                <strong className="text-gray-900 dark:text-white">{selectedUser.full_name || selectedUser.email}</strong> kullanıcısını silmek istediğinize emin misiniz?
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
                 Bu işlem geri alınamaz. Kullanıcı tüm verileriyle birlikte silinecektir.
               </p>
             </div>
