@@ -11,6 +11,15 @@ export function createAdminClient() {
   return createClient(url, serviceRoleKey, {
     auth: {
       persistSession: false,
+      autoRefreshToken: false,
+    },
+    global: {
+      headers: {
+        'x-client-info': 'stocktaking-red-admin',
+      },
+    },
+    db: {
+      schema: 'public',
     },
   })
 }

@@ -79,6 +79,8 @@ export async function POST(request: Request) {
     console.log('[Signup] Attempting to create auth user:', { email, hasPassword: !!password })
     
     let createdUser, createUserError
+    
+    // Try using Supabase client first
     try {
       const result = await adminClient.auth.admin.createUser({
         email,
@@ -91,17 +93,101 @@ export async function POST(request: Request) {
       })
       createdUser = result.data
       createUserError = result.error
+      
+      // If client method fails, try REST API as fallback (for Netlify compatibility)
+      if (createUserError) {
+        console.log('[Signup] Client method failed, trying REST API fallback...')
+        try {
+          const restResponse = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${serviceRoleKey}`,
+              'apikey': serviceRoleKey,
+            },
+            body: JSON.stringify({
+              email,
+              password,
+              email_confirm: true,
+              user_metadata: {
+                full_name: fullName,
+                company_name: companyName,
+              },
+            }),
+          })
+          
+          if (restResponse.ok) {
+            const userData = await restResponse.json()
+            createdUser = { user: userData }
+            createUserError = null
+            console.log('[Signup] REST API fallback succeeded')
+          } else {
+            const errorData = await restResponse.json().catch(() => ({ message: 'Unknown error' }))
+            createUserError = {
+              message: errorData.message || `HTTP ${restResponse.status}`,
+              status: restResponse.status,
+            }
+            console.error('[Signup] REST API fallback also failed:', createUserError)
+          }
+        } catch (restError) {
+          console.error('[Signup] REST API fallback exception:', restError)
+          // Keep original error from client method
+        }
+      }
     } catch (authError) {
       console.error('[Signup] Exception during createUser:', {
         error: authError,
         message: authError instanceof Error ? authError.message : 'Unknown error',
         stack: authError instanceof Error ? authError.stack : undefined,
       })
-      createUserError = authError instanceof Error ? {
-        message: authError.message,
-        status: 500,
-        name: authError.name,
-      } : { message: 'Unknown error', status: 500, name: 'Error' }
+      
+      // Try REST API as fallback when exception occurs
+      try {
+        console.log('[Signup] Exception occurred, trying REST API fallback...')
+        const restResponse = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'apikey': serviceRoleKey,
+          },
+          body: JSON.stringify({
+            email,
+            password,
+            email_confirm: true,
+            user_metadata: {
+              full_name: fullName,
+              company_name: companyName,
+            },
+          }),
+        })
+        
+        if (restResponse.ok) {
+          const userData = await restResponse.json()
+          createdUser = { user: userData }
+          createUserError = null
+          console.log('[Signup] REST API fallback succeeded after exception')
+        } else {
+          const errorData = await restResponse.json().catch(() => ({ message: 'Unknown error' }))
+          const authErrorMessage = authError instanceof Error ? authError.message : 'Unknown error'
+          const authErrorName = authError instanceof Error ? authError.name : 'Error'
+          createUserError = {
+            message: errorData.message || authErrorMessage,
+            status: restResponse.status,
+            name: authErrorName,
+          }
+          console.error('[Signup] REST API fallback failed:', createUserError)
+        }
+      } catch (restError) {
+        console.error('[Signup] REST API fallback exception:', restError)
+        const authErrorMessage = authError instanceof Error ? authError.message : 'Unknown error'
+        const authErrorName = authError instanceof Error ? authError.name : 'Error'
+        createUserError = {
+          message: authErrorMessage,
+          status: 500,
+          name: authErrorName,
+        }
+      }
     }
 
     if (createUserError) {
