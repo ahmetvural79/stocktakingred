@@ -91,6 +91,15 @@ export async function POST(request: Request) {
       'Prefer': 'return=representation', // Return inserted data
     }
 
+    console.log('[Signup] REST API headers prepared:', {
+      hasAuthorization: !!restApiHeaders['Authorization'],
+      hasApikey: !!restApiHeaders['apikey'],
+      authorizationLength: restApiHeaders['Authorization']?.length || 0,
+      apikeyLength: restApiHeaders['apikey']?.length || 0,
+      authorizationPrefix: restApiHeaders['Authorization']?.substring(0, 30) || 'missing',
+      apikeyPrefix: restApiHeaders['apikey']?.substring(0, 30) || 'missing',
+    })
+
     // 1. Create auth user using Admin API (service role key) - email_confirm: true
     console.log('[Signup] Attempting to create auth user with admin API:', { email, hasPassword: !!password })
     
@@ -268,7 +277,17 @@ export async function POST(request: Request) {
     console.log('[Signup] ✅ User ID obtained:', { userId, email })
 
     // 2. Create company using REST API (bypasses RLS)
-    console.log('[Signup] Attempting to create company via REST API:', { companyName, userId })
+    console.log('[Signup] Attempting to create company via REST API:', { 
+      companyName, 
+      userId,
+      requestUrl: `${supabaseUrl}/rest/v1/companies`,
+      headers: {
+        hasAuthorization: !!restApiHeaders['Authorization'],
+        hasApikey: !!restApiHeaders['apikey'],
+        hasContentType: !!restApiHeaders['Content-Type'],
+        hasPrefer: !!restApiHeaders['Prefer'],
+      },
+    })
     
     let company, companyError
     try {
@@ -278,22 +297,47 @@ export async function POST(request: Request) {
         body: JSON.stringify({ name: companyName }),
       })
 
+      console.log('[Signup] Company REST API response:', {
+        status: companyResponse.status,
+        statusText: companyResponse.statusText,
+        ok: companyResponse.ok,
+        headers: Object.fromEntries(companyResponse.headers.entries()),
+      })
+
       if (companyResponse.ok) {
         const companyData = await companyResponse.json()
+        console.log('[Signup] Company REST API response data:', {
+          dataType: typeof companyData,
+          isArray: Array.isArray(companyData),
+          dataLength: Array.isArray(companyData) ? companyData.length : 'N/A',
+          rawData: JSON.stringify(companyData).substring(0, 200),
+        })
         // REST API returns array when using Prefer: return=representation
         company = Array.isArray(companyData) ? companyData[0] : companyData
         companyError = null
-        console.log('[Signup] ✅ Company created successfully via REST API:', { companyId: company.id, companyName })
+        console.log('[Signup] ✅ Company created successfully via REST API:', { 
+          companyId: company?.id, 
+          companyName,
+          fullCompanyData: company,
+        })
       } else {
         const errorText = await companyResponse.text()
+        console.error('[Signup] Company REST API error response:', {
+          status: companyResponse.status,
+          statusText: companyResponse.statusText,
+          errorText: errorText.substring(0, 500),
+          errorTextLength: errorText.length,
+        })
         let errorData
         try {
           errorData = JSON.parse(errorText)
-        } catch {
+          console.error('[Signup] Parsed error data:', errorData)
+        } catch (parseError) {
+          console.error('[Signup] Failed to parse error JSON:', parseError)
           errorData = { message: errorText || 'Unknown error' }
         }
         companyError = {
-          message: errorData.message || errorData.error_description || `HTTP ${companyResponse.status}`,
+          message: errorData.message || errorData.error_description || errorData.error || `HTTP ${companyResponse.status}`,
           status: companyResponse.status,
           code: errorData.code,
           details: errorData.details,
@@ -306,8 +350,10 @@ export async function POST(request: Request) {
           error: companyError,
           errorData: errorData,
           responseText: errorText,
+          responseTextLength: errorText.length,
           requestUrl: `${supabaseUrl}/rest/v1/companies`,
           requestMethod: 'POST',
+          requestHeaders: restApiHeaders,
           requestData: { name: companyName },
         })
       }
@@ -414,7 +460,7 @@ export async function POST(request: Request) {
       companyId: company.id,
       email,
       fullName,
-      role: 'user',
+      role: 'admin',
     })
     
     let userInsertError
@@ -427,28 +473,51 @@ export async function POST(request: Request) {
           company_id: company.id,
           full_name: fullName,
           email,
-          role: 'user',
+          role: 'admin',
         }),
       })
 
+      console.log('[Signup] User insert REST API response:', {
+        status: userInsertResponse.status,
+        statusText: userInsertResponse.statusText,
+        ok: userInsertResponse.ok,
+        headers: Object.fromEntries(userInsertResponse.headers.entries()),
+      })
+
       if (userInsertResponse.ok) {
+        const userInsertData = await userInsertResponse.json()
+        console.log('[Signup] User insert REST API response data:', {
+          dataType: typeof userInsertData,
+          isArray: Array.isArray(userInsertData),
+          dataLength: Array.isArray(userInsertData) ? userInsertData.length : 'N/A',
+          rawData: JSON.stringify(userInsertData).substring(0, 200),
+        })
         userInsertError = null
         console.log('[Signup] ✅ User record inserted successfully via REST API:', {
           userId,
           companyId: company.id,
           email,
-          role: 'user',
+          role: 'admin',
+          insertedData: userInsertData,
         })
       } else {
         const errorText = await userInsertResponse.text()
+        console.error('[Signup] User insert REST API error response:', {
+          status: userInsertResponse.status,
+          statusText: userInsertResponse.statusText,
+          errorText: errorText.substring(0, 500),
+          errorTextLength: errorText.length,
+        })
         let errorData
         try {
           errorData = JSON.parse(errorText)
-        } catch {
+          console.error('[Signup] Parsed error data:', errorData)
+        } catch (parseError) {
+          console.error('[Signup] Failed to parse error JSON:', parseError)
           errorData = { message: errorText || 'Unknown error' }
         }
         userInsertError = {
-          message: errorData.message || errorData.error_description || `HTTP ${userInsertResponse.status}`,
+          message: errorData.message || errorData.error_description || errorData.error || `HTTP ${userInsertResponse.status}`,
           status: userInsertResponse.status,
           code: errorData.code,
           details: errorData.details,
@@ -461,14 +530,16 @@ export async function POST(request: Request) {
           error: userInsertError,
           errorData: errorData,
           responseText: errorText,
+          responseTextLength: errorText.length,
           requestUrl: `${supabaseUrl}/rest/v1/users`,
           requestMethod: 'POST',
+          requestHeaders: restApiHeaders,
           requestData: {
             id: userId,
             company_id: company.id,
             full_name: fullName,
             email,
-            role: 'user',
+            role: 'admin',
           },
         })
       }
