@@ -76,7 +76,7 @@ export async function POST(request: Request) {
 
     // Check environment variables - service role key required for admin operations
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const serviceRoleKey = process.env.SAKEY!
 
     console.log('[Signup] Environment check:', {
       hasServiceRoleKey: !!serviceRoleKey,
