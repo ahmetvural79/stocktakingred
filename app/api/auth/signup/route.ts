@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 interface SignupRequestBody {
@@ -30,23 +30,22 @@ export async function POST(request: Request) {
       )
     }
 
-    // Check environment variables - using anon key like login function
+    // Check environment variables - service role key required for admin operations
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() // Still needed for admin operations
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
 
     console.log('[Signup] Environment check:', {
-      hasAnonKey: !!anonKey,
-      hasSupabaseUrl: !!supabaseUrl,
       hasServiceRoleKey: !!serviceRoleKey,
-      anonKeyLength: anonKey?.length || 0,
-      anonKeyPrefix: anonKey ? anonKey.substring(0, 20) : 'missing',
+      hasSupabaseUrl: !!supabaseUrl,
+      serviceRoleKeyLength: serviceRoleKey?.length || 0,
+      serviceRoleKeyPrefix: serviceRoleKey ? serviceRoleKey.substring(0, 20) : 'missing',
+      serviceRoleKeyStartsWithEyJ: serviceRoleKey?.startsWith('eyJ') || false,
       supabaseUrlValue: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'missing',
     })
 
-    if (!supabaseUrl || !anonKey) {
+    if (!supabaseUrl || !serviceRoleKey) {
       console.error('[Signup] Missing environment variables:', {
-        hasAnonKey: !!anonKey,
+        hasServiceRoleKey: !!serviceRoleKey,
         hasSupabaseUrl: !!supabaseUrl,
         allEnvKeys: Object.keys(process.env).filter(key => key.includes('SUPABASE')),
       })
@@ -59,13 +58,13 @@ export async function POST(request: Request) {
       )
     }
 
-    // Create Supabase client with anon key (like login function)
-    let supabaseClient
+    // Create admin client for database operations (bypasses RLS)
+    let adminClient
     try {
-      supabaseClient = await createClient()
-      console.log('[Signup] Supabase client created successfully with anon key')
+      adminClient = createAdminClient()
+      console.log('[Signup] Admin client created successfully')
     } catch (clientError) {
-      console.error('[Signup] Failed to create supabase client:', {
+      console.error('[Signup] Failed to create admin client:', {
         error: clientError,
         message: clientError instanceof Error ? clientError.message : 'Unknown error',
         stack: clientError instanceof Error ? clientError.stack : undefined,
@@ -73,156 +72,72 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { 
           error: 'Sunucu yapılandırma hatası. Lütfen yöneticiyle iletişime geçin.',
-          details: clientError instanceof Error ? clientError.message : 'Supabase client oluşturulamadı'
+          details: clientError instanceof Error ? clientError.message : 'Admin client oluşturulamadı'
         },
         { status: 500 }
       )
     }
 
-    // 1. Create auth user using anon key (like login function)
-    console.log('[Signup] Attempting to create auth user with anon key:', { email, hasPassword: !!password })
+    // 1. Create auth user using Admin API (service role key) - email_confirm: true
+    console.log('[Signup] Attempting to create auth user with admin API:', { email, hasPassword: !!password })
     
     let createdUser, createUserError
     
-    // Use Supabase signUp method with anon key (like login uses signInWithPassword)
+    // Use Admin API directly (bypasses email confirmation requirement)
     try {
-      const { data, error } = await supabaseClient.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
+      const restResponse = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceRoleKey}`,
+          'apikey': serviceRoleKey,
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: {
             full_name: fullName,
             company_name: companyName,
           },
-          emailRedirectTo: `${supabaseUrl}/dashboard`,
-        },
+        }),
       })
       
-      createdUser = data
-      createUserError = error
-      
-      // If signUp fails and we have service role key, try admin API as fallback
-      if (createUserError && serviceRoleKey) {
-        console.log('[Signup] Anon key signUp failed, trying admin API fallback...')
+      if (restResponse.ok) {
+        const userData = await restResponse.json()
+        // Supabase Admin API returns { user: {...} } format
+        createdUser = userData.user ? userData : { user: userData }
+        createUserError = null
+        console.log('[Signup] Auth user created successfully via Admin API')
+      } else {
+        const errorText = await restResponse.text()
+        let errorData
         try {
-          const restResponse = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${serviceRoleKey}`,
-              'apikey': serviceRoleKey,
-            },
-            body: JSON.stringify({
-              email,
-              password,
-              email_confirm: true,
-              user_metadata: {
-                full_name: fullName,
-                company_name: companyName,
-              },
-            }),
-          })
-          
-          if (restResponse.ok) {
-            const userData = await restResponse.json()
-            createdUser = userData.user ? userData : { user: userData }
-            createUserError = null
-            console.log('[Signup] Admin API fallback succeeded')
-          } else {
-            const errorText = await restResponse.text()
-            let errorData
-            try {
-              errorData = JSON.parse(errorText)
-            } catch {
-              errorData = { message: errorText || 'Unknown error' }
-            }
-            createUserError = {
-              message: errorData.message || errorData.error_description || `HTTP ${restResponse.status}`,
-              status: restResponse.status,
-            }
-            console.error('[Signup] Admin API fallback also failed:', {
-              status: restResponse.status,
-              error: createUserError,
-              responseText: errorText.substring(0, 200),
-            })
-          }
-        } catch (restError) {
-          console.error('[Signup] Admin API fallback exception:', restError)
-          // Keep original error from signUp method
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { message: errorText || 'Unknown error' }
         }
+        createUserError = {
+          message: errorData.message || errorData.error_description || `HTTP ${restResponse.status}`,
+          status: restResponse.status,
+        }
+        console.error('[Signup] Admin API failed:', {
+          status: restResponse.status,
+          error: createUserError,
+          responseText: errorText.substring(0, 200),
+        })
       }
     } catch (authError) {
-      console.error('[Signup] Exception during signUp:', {
+      console.error('[Signup] Exception during admin API call:', {
         error: authError,
         message: authError instanceof Error ? authError.message : 'Unknown error',
         stack: authError instanceof Error ? authError.stack : undefined,
       })
-      
-      // Try admin API as fallback when exception occurs (if service role key available)
-      if (serviceRoleKey) {
-        try {
-          console.log('[Signup] Exception occurred, trying admin API fallback...')
-          const restResponse = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${serviceRoleKey}`,
-              'apikey': serviceRoleKey,
-            },
-            body: JSON.stringify({
-              email,
-              password,
-              email_confirm: true,
-              user_metadata: {
-                full_name: fullName,
-                company_name: companyName,
-              },
-            }),
-          })
-          
-          if (restResponse.ok) {
-            const userData = await restResponse.json()
-            createdUser = userData.user ? userData : { user: userData }
-            createUserError = null
-            console.log('[Signup] Admin API fallback succeeded after exception')
-          } else {
-            const errorText = await restResponse.text()
-            let errorData
-            try {
-              errorData = JSON.parse(errorText)
-            } catch {
-              errorData = { message: errorText || 'Unknown error' }
-            }
-            const authErrorMessage = authError instanceof Error ? authError.message : 'Unknown error'
-            const authErrorName = authError instanceof Error ? authError.name : 'Error'
-            createUserError = {
-              message: errorData.message || errorData.error_description || authErrorMessage,
-              status: restResponse.status,
-              name: authErrorName,
-            }
-            console.error('[Signup] Admin API fallback failed:', {
-              status: restResponse.status,
-              error: createUserError,
-              responseText: errorText.substring(0, 200),
-            })
-          }
-        } catch (restError) {
-          console.error('[Signup] Admin API fallback exception:', restError)
-          const authErrorMessage = authError instanceof Error ? authError.message : 'Unknown error'
-          const authErrorName = authError instanceof Error ? authError.name : 'Error'
-          createUserError = {
-            message: authErrorMessage,
-            status: 500,
-            name: authErrorName,
-          }
-        }
-      } else {
-        createUserError = authError instanceof Error ? {
-          message: authError.message,
-          status: 500,
-          name: authError.name,
-        } : { message: 'Unknown error', status: 500, name: 'Error' }
-      }
+      createUserError = authError instanceof Error ? {
+        message: authError.message,
+        status: 500,
+        name: authError.name,
+      } : { message: 'Unknown error', status: 500, name: 'Error' }
     }
 
     if (createUserError) {
@@ -271,8 +186,8 @@ export async function POST(request: Request) {
       )
     }
 
-    // Get user ID from signUp response (format: { user: { id: ... } } or { id: ... })
-    const userId = createdUser?.user?.id || createdUser?.id
+    // Get user ID from Admin API response (format: { user: { id: ... } })
+    const userId = createdUser?.user?.id
 
     if (!userId) {
       console.error('[Signup] No user ID in response:', { createdUser })
@@ -282,8 +197,8 @@ export async function POST(request: Request) {
       )
     }
 
-    // 2. Create company using supabase client (with anon key)
-    const { data: company, error: companyError } = await supabaseClient
+    // 2. Create company using admin client (bypasses RLS)
+    const { data: company, error: companyError } = await adminClient
       .from('companies')
       .insert({ name: companyName })
       .select('id')
@@ -306,28 +221,7 @@ export async function POST(request: Request) {
         companyError?.code === '42501'
       ) {
         console.error('[Signup] API key validation failed during company creation')
-        // cleanup auth user (using admin API if service role key available)
-        if (serviceRoleKey) {
-          try {
-            await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
-              method: 'DELETE',
-              headers: {
-                'Authorization': `Bearer ${serviceRoleKey}`,
-                'apikey': serviceRoleKey,
-              },
-            })
-          } catch (cleanupError) {
-            console.error('[Signup] Failed to cleanup auth user:', cleanupError)
-          }
-        }
-        return NextResponse.json(
-          { error: 'Sunucu kimlik doğrulama hatası. Lütfen yöneticiyle iletişime geçin.' },
-          { status: 500 }
-        )
-      }
-
-      // cleanup auth user (using admin API if service role key available)
-      if (serviceRoleKey) {
+        // cleanup auth user (using admin API)
         try {
           await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
             method: 'DELETE',
@@ -339,6 +233,23 @@ export async function POST(request: Request) {
         } catch (cleanupError) {
           console.error('[Signup] Failed to cleanup auth user:', cleanupError)
         }
+        return NextResponse.json(
+          { error: 'Sunucu kimlik doğrulama hatası. Lütfen yöneticiyle iletişime geçin.' },
+          { status: 500 }
+        )
+      }
+
+      // cleanup auth user (using admin API)
+      try {
+        await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'apikey': serviceRoleKey,
+          },
+        })
+      } catch (cleanupError) {
+        console.error('[Signup] Failed to cleanup auth user:', cleanupError)
       }
 
       return NextResponse.json(
@@ -347,13 +258,13 @@ export async function POST(request: Request) {
       )
     }
 
-    // 3. Insert user record using supabase client (with anon key)
-    const { error: userInsertError } = await supabaseClient.from('users').insert({
+    // 3. Insert user record using admin client (bypasses RLS)
+    const { error: userInsertError } = await adminClient.from('users').insert({
       id: userId,
       company_id: company.id,
       full_name: fullName,
       email,
-      role: 'admin',
+      role: 'user',
     })
 
     if (userInsertError) {
@@ -373,29 +284,7 @@ export async function POST(request: Request) {
         userInsertError.code === '42501'
       ) {
         console.error('[Signup] API key validation failed during user insert')
-        // cleanup (using admin API if service role key available)
-        if (serviceRoleKey) {
-          try {
-            await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
-              method: 'DELETE',
-              headers: {
-                'Authorization': `Bearer ${serviceRoleKey}`,
-                'apikey': serviceRoleKey,
-              },
-            })
-            await supabaseClient.from('companies').delete().eq('id', company.id)
-          } catch (cleanupError) {
-            console.error('[Signup] Failed to cleanup:', cleanupError)
-          }
-        }
-        return NextResponse.json(
-          { error: 'Sunucu kimlik doğrulama hatası. Lütfen yöneticiyle iletişime geçin.' },
-          { status: 500 }
-        )
-      }
-
-      // cleanup (using admin API if service role key available)
-      if (serviceRoleKey) {
+        // cleanup (using admin API and admin client)
         try {
           await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
             method: 'DELETE',
@@ -404,10 +293,28 @@ export async function POST(request: Request) {
               'apikey': serviceRoleKey,
             },
           })
-          await supabaseClient.from('companies').delete().eq('id', company.id)
+          await adminClient.from('companies').delete().eq('id', company.id)
         } catch (cleanupError) {
           console.error('[Signup] Failed to cleanup:', cleanupError)
         }
+        return NextResponse.json(
+          { error: 'Sunucu kimlik doğrulama hatası. Lütfen yöneticiyle iletişime geçin.' },
+          { status: 500 }
+        )
+      }
+
+      // cleanup (using admin API and admin client)
+      try {
+        await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'apikey': serviceRoleKey,
+          },
+        })
+        await adminClient.from('companies').delete().eq('id', company.id)
+      } catch (cleanupError) {
+        console.error('[Signup] Failed to cleanup:', cleanupError)
       }
 
       return NextResponse.json(
