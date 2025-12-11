@@ -133,6 +133,7 @@ Tüm değişiklikler uygulandı:
 6. ✅ **Cleanup işlemleri**: Admin API ve admin client kullanılıyor
 7. ✅ **Hata yönetimi**: İyileştirildi
 8. ✅ **Loglama**: Detaylandırıldı
+9. ✅ **Detaylı hata loglama**: Tüm hatalar console.log'a yazılıyor
 
 ### Sonuç:
 
@@ -142,9 +143,46 @@ Tüm değişiklikler uygulandı:
 - ✅ Email confirmation gerektirmiyor
 - ✅ Netlify'da çalışacak
 
+## 📊 Detaylı Hata Loglama Eklendi
+
+Tüm hata durumları için detaylı console.log eklendi:
+
+### Loglanan Hata Detayları:
+
+1. ✅ **Request validation hataları**: Eksik alanlar, şifre uzunluğu
+2. ✅ **Environment variable hataları**: Eksik/yanlış key'ler
+3. ✅ **Admin client oluşturma hataları**: Exception detayları
+4. ✅ **Auth user oluşturma hataları**: 
+   - HTTP status, response text, error data
+   - Request URL, method, headers, body
+   - Exception stack trace
+5. ✅ **Company oluşturma hataları**:
+   - Error code, message, details, hint
+   - Full error JSON
+   - Request data
+6. ✅ **User insert hataları**:
+   - Error code, message, details, hint
+   - Full error JSON
+   - Request data
+7. ✅ **Cleanup hataları**: Her cleanup işlemi için detaylı log
+8. ✅ **Unexpected errors**: Top level catch için tam error detayları
+
+### Log Formatı:
+
+- ✅ Başarılı işlemler: `[Signup] ✅ ...`
+- ❌ Hatalar: `[Signup] ❌ ...`
+- 📋 Bilgi: `[Signup] ...`
+
+Her log'da:
+- `step`: Hangi adımda hata olduğu
+- `errorType`: Hata tipi
+- `timestamp`: Zaman damgası
+- `fullError`: Tam hata detayları (JSON stringify)
+
 ## 🧪 Test Edilmesi Gerekenler
 
 1. Netlify'da signup işlemini test edin
 2. "Invalid API key" hatası çözülmüş olmalı
 3. Company ve user insert işlemleri başarılı olmalı
+4. Netlify Functions log'larında detaylı hata mesajları görünecek
 
