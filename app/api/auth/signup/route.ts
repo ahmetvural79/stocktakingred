@@ -5,15 +5,32 @@ interface SignupRequestBody {
   password: string
   companyName: string
   fullName: string
+  role?: string // Optional: defaults to 'admin' for signup
 }
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as Partial<SignupRequestBody>
+    // Parse request body with error handling
+    let body: Partial<SignupRequestBody>
+    try {
+      body = (await request.json()) as Partial<SignupRequestBody>
+    } catch (parseError) {
+      console.error('[Signup] ❌ JSON parse error:', {
+        error: parseError,
+        message: parseError instanceof Error ? parseError.message : 'Unknown error',
+      })
+      return NextResponse.json(
+        { error: 'Geçersiz istek formatı. Lütfen tekrar deneyin.' },
+        { status: 400 }
+      )
+    }
+
     const email = body.email?.trim().toLowerCase() || ''
     const password = body.password || ''
     const companyName = body.companyName?.trim() || ''
     const fullName = body.fullName?.trim() || ''
+    // Role: Accept from body but default to 'admin' for signup (first user is always admin)
+    const role = body.role && ['admin', 'user'].includes(body.role) ? body.role : 'admin'
 
     console.log('[Signup] Request received:', {
       hasEmail: !!email,
@@ -24,6 +41,8 @@ export async function POST(request: Request) {
       passwordLength: password.length,
       companyNameLength: companyName.length,
       fullNameLength: fullName.length,
+      role: role,
+      rawBody: JSON.stringify(body).substring(0, 200), // Log first 200 chars of body
     })
 
     if (!email || !password || !companyName || !fullName) {
@@ -56,8 +75,8 @@ export async function POST(request: Request) {
     }
 
     // Check environment variables - service role key required for admin operations
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
     console.log('[Signup] Environment check:', {
       hasServiceRoleKey: !!serviceRoleKey,
@@ -460,7 +479,7 @@ export async function POST(request: Request) {
       companyId: company.id,
       email,
       fullName,
-      role: 'admin',
+      role: role,
     })
     
     let userInsertError
@@ -473,7 +492,7 @@ export async function POST(request: Request) {
           company_id: company.id,
           full_name: fullName,
           email,
-          role: 'admin',
+          role: role,
         }),
       })
 
@@ -497,7 +516,7 @@ export async function POST(request: Request) {
           userId,
           companyId: company.id,
           email,
-          role: 'admin',
+          role: role,
           insertedData: userInsertData,
         })
       } else {
@@ -539,7 +558,7 @@ export async function POST(request: Request) {
             company_id: company.id,
             full_name: fullName,
             email,
-            role: 'admin',
+            role: role,
           },
         })
       }
