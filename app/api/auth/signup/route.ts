@@ -1,4 +1,3 @@
-import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 interface SignupRequestBody {
@@ -84,24 +83,12 @@ export async function POST(request: Request) {
       )
     }
 
-    // Create admin client for database operations (bypasses RLS)
-    let adminClient
-    try {
-      adminClient = createAdminClient()
-      console.log('[Signup] Admin client created successfully')
-    } catch (clientError) {
-      console.error('[Signup] Failed to create admin client:', {
-        error: clientError,
-        message: clientError instanceof Error ? clientError.message : 'Unknown error',
-        stack: clientError instanceof Error ? clientError.stack : undefined,
-      })
-      return NextResponse.json(
-        { 
-          error: 'Sunucu yapılandırma hatası. Lütfen yöneticiyle iletişime geçin.',
-          details: clientError instanceof Error ? clientError.message : 'Admin client oluşturulamadı'
-        },
-        { status: 500 }
-      )
+    // REST API headers for all Supabase operations
+    const restApiHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${serviceRoleKey}`,
+      'apikey': serviceRoleKey,
+      'Prefer': 'return=representation', // Return inserted data
     }
 
     // 1. Create auth user using Admin API (service role key) - email_confirm: true
@@ -280,29 +267,65 @@ export async function POST(request: Request) {
 
     console.log('[Signup] ✅ User ID obtained:', { userId, email })
 
-    // 2. Create company using admin client (bypasses RLS)
-    console.log('[Signup] Attempting to create company:', { companyName, userId })
-    const { data: company, error: companyError } = await adminClient
-      .from('companies')
-      .insert({ name: companyName })
-      .select('id')
-      .single()
-
-    if (companyError || !company) {
-      console.error('[Signup] ❌ Company creation error:', {
-        step: 'create_company',
-        error: companyError,
-        errorType: companyError?.constructor?.name || typeof companyError,
-        message: companyError?.message,
-        code: companyError?.code,
-        details: companyError?.details,
-        hint: companyError?.hint,
-        hasCompany: !!company,
-        companyData: company,
-        fullError: JSON.stringify(companyError, Object.getOwnPropertyNames(companyError || {}), 2),
-        requestData: { name: companyName },
+    // 2. Create company using REST API (bypasses RLS)
+    console.log('[Signup] Attempting to create company via REST API:', { companyName, userId })
+    
+    let company, companyError
+    try {
+      const companyResponse = await fetch(`${supabaseUrl}/rest/v1/companies`, {
+        method: 'POST',
+        headers: restApiHeaders,
+        body: JSON.stringify({ name: companyName }),
       })
 
+      if (companyResponse.ok) {
+        const companyData = await companyResponse.json()
+        // REST API returns array when using Prefer: return=representation
+        company = Array.isArray(companyData) ? companyData[0] : companyData
+        companyError = null
+        console.log('[Signup] ✅ Company created successfully via REST API:', { companyId: company.id, companyName })
+      } else {
+        const errorText = await companyResponse.text()
+        let errorData
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { message: errorText || 'Unknown error' }
+        }
+        companyError = {
+          message: errorData.message || errorData.error_description || `HTTP ${companyResponse.status}`,
+          status: companyResponse.status,
+          code: errorData.code,
+          details: errorData.details,
+          hint: errorData.hint,
+        }
+        console.error('[Signup] ❌ Company creation error via REST API:', {
+          step: 'create_company',
+          status: companyResponse.status,
+          statusText: companyResponse.statusText,
+          error: companyError,
+          errorData: errorData,
+          responseText: errorText,
+          requestUrl: `${supabaseUrl}/rest/v1/companies`,
+          requestMethod: 'POST',
+          requestData: { name: companyName },
+        })
+      }
+    } catch (companyFetchError) {
+      console.error('[Signup] ❌ Exception during company creation via REST API:', {
+        step: 'create_company',
+        error: companyFetchError,
+        errorType: companyFetchError instanceof Error ? companyFetchError.constructor.name : typeof companyFetchError,
+        message: companyFetchError instanceof Error ? companyFetchError.message : 'Unknown error',
+        stack: companyFetchError instanceof Error ? companyFetchError.stack : undefined,
+      })
+      companyError = {
+        message: companyFetchError instanceof Error ? companyFetchError.message : 'Unknown error',
+        status: 500,
+      }
+    }
+
+    if (companyError || !company) {
       // Handle invalid API key errors in company creation
       const errorMessage = companyError?.message?.toLowerCase() || ''
       if (
@@ -310,7 +333,9 @@ export async function POST(request: Request) {
         errorMessage.includes('invalid key') ||
         errorMessage.includes('api key') ||
         companyError?.code === 'PGRST301' ||
-        companyError?.code === '42501'
+        companyError?.code === '42501' ||
+        companyError?.status === 401 ||
+        companyError?.status === 403
       ) {
         console.error('[Signup] ❌ API key validation failed during company creation:', {
           step: 'create_company',
@@ -383,43 +408,85 @@ export async function POST(request: Request) {
       )
     }
 
-    console.log('[Signup] ✅ Company created successfully:', { companyId: company.id, companyName })
-
-    // 3. Insert user record using admin client (bypasses RLS)
-    console.log('[Signup] Attempting to insert user record:', {
+    // 3. Insert user record using REST API (bypasses RLS)
+    console.log('[Signup] Attempting to insert user record via REST API:', {
       userId,
       companyId: company.id,
       email,
       fullName,
       role: 'user',
     })
-    const { error: userInsertError } = await adminClient.from('users').insert({
-      id: userId,
-      company_id: company.id,
-      full_name: fullName,
-      email,
-      role: 'user',
-    })
-
-    if (userInsertError) {
-      console.error('[Signup] ❌ User insert error:', {
-        step: 'insert_user',
-        error: userInsertError,
-        errorType: userInsertError?.constructor?.name || typeof userInsertError,
-        message: userInsertError.message,
-        code: userInsertError.code,
-        details: userInsertError.details,
-        hint: userInsertError.hint,
-        fullError: JSON.stringify(userInsertError, Object.getOwnPropertyNames(userInsertError || {}), 2),
-        requestData: {
+    
+    let userInsertError
+    try {
+      const userInsertResponse = await fetch(`${supabaseUrl}/rest/v1/users`, {
+        method: 'POST',
+        headers: restApiHeaders,
+        body: JSON.stringify({
           id: userId,
           company_id: company.id,
           full_name: fullName,
           email,
           role: 'user',
-        },
+        }),
       })
 
+      if (userInsertResponse.ok) {
+        userInsertError = null
+        console.log('[Signup] ✅ User record inserted successfully via REST API:', {
+          userId,
+          companyId: company.id,
+          email,
+          role: 'user',
+        })
+      } else {
+        const errorText = await userInsertResponse.text()
+        let errorData
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { message: errorText || 'Unknown error' }
+        }
+        userInsertError = {
+          message: errorData.message || errorData.error_description || `HTTP ${userInsertResponse.status}`,
+          status: userInsertResponse.status,
+          code: errorData.code,
+          details: errorData.details,
+          hint: errorData.hint,
+        }
+        console.error('[Signup] ❌ User insert error via REST API:', {
+          step: 'insert_user',
+          status: userInsertResponse.status,
+          statusText: userInsertResponse.statusText,
+          error: userInsertError,
+          errorData: errorData,
+          responseText: errorText,
+          requestUrl: `${supabaseUrl}/rest/v1/users`,
+          requestMethod: 'POST',
+          requestData: {
+            id: userId,
+            company_id: company.id,
+            full_name: fullName,
+            email,
+            role: 'user',
+          },
+        })
+      }
+    } catch (userInsertFetchError) {
+      console.error('[Signup] ❌ Exception during user insert via REST API:', {
+        step: 'insert_user',
+        error: userInsertFetchError,
+        errorType: userInsertFetchError instanceof Error ? userInsertFetchError.constructor.name : typeof userInsertFetchError,
+        message: userInsertFetchError instanceof Error ? userInsertFetchError.message : 'Unknown error',
+        stack: userInsertFetchError instanceof Error ? userInsertFetchError.stack : undefined,
+      })
+      userInsertError = {
+        message: userInsertFetchError instanceof Error ? userInsertFetchError.message : 'Unknown error',
+        status: 500,
+      }
+    }
+
+    if (userInsertError) {
       // Handle invalid API key errors in user insert
       const errorMessage = userInsertError.message?.toLowerCase() || ''
       if (
@@ -427,7 +494,9 @@ export async function POST(request: Request) {
         errorMessage.includes('invalid key') ||
         errorMessage.includes('api key') ||
         userInsertError.code === 'PGRST301' ||
-        userInsertError.code === '42501'
+        userInsertError.code === '42501' ||
+        userInsertError.status === 401 ||
+        userInsertError.status === 403
       ) {
         console.error('[Signup] ❌ API key validation failed during user insert:', {
           step: 'insert_user',
@@ -437,7 +506,7 @@ export async function POST(request: Request) {
           hasServiceRoleKey: !!serviceRoleKey,
           serviceRoleKeyLength: serviceRoleKey?.length || 0,
         })
-        // cleanup (using admin API and admin client)
+        // cleanup (using admin API and REST API)
         try {
           console.log('[Signup] Attempting to cleanup auth user and company after user insert failure...')
           const cleanupUserResponse = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
@@ -456,15 +525,18 @@ export async function POST(request: Request) {
             })
           }
           
-          const { error: companyDeleteError } = await adminClient.from('companies').delete().eq('id', company.id)
-          if (companyDeleteError) {
-            console.error('[Signup] ❌ Company cleanup failed:', {
-              error: companyDeleteError,
-              message: companyDeleteError.message,
-              code: companyDeleteError.code,
-            })
-          } else {
+          // Delete company via REST API
+          const companyDeleteResponse = await fetch(`${supabaseUrl}/rest/v1/companies?id=eq.${company.id}`, {
+            method: 'DELETE',
+            headers: restApiHeaders,
+          })
+          if (companyDeleteResponse.ok) {
             console.log('[Signup] ✅ Company cleanup successful')
+          } else {
+            console.error('[Signup] ❌ Company cleanup failed:', {
+              status: companyDeleteResponse.status,
+              statusText: companyDeleteResponse.statusText,
+            })
           }
         } catch (cleanupError) {
           console.error('[Signup] ❌ Exception during cleanup:', {
@@ -479,7 +551,7 @@ export async function POST(request: Request) {
         )
       }
 
-      // cleanup (using admin API and admin client)
+      // cleanup (using admin API and REST API)
       try {
         console.log('[Signup] Attempting to cleanup auth user and company after user insert error...')
         const cleanupUserResponse = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
@@ -498,15 +570,18 @@ export async function POST(request: Request) {
           })
         }
         
-        const { error: companyDeleteError } = await adminClient.from('companies').delete().eq('id', company.id)
-        if (companyDeleteError) {
-          console.error('[Signup] ❌ Company cleanup failed:', {
-            error: companyDeleteError,
-            message: companyDeleteError.message,
-            code: companyDeleteError.code,
-          })
-        } else {
+        // Delete company via REST API
+        const companyDeleteResponse = await fetch(`${supabaseUrl}/rest/v1/companies?id=eq.${company.id}`, {
+          method: 'DELETE',
+          headers: restApiHeaders,
+        })
+        if (companyDeleteResponse.ok) {
           console.log('[Signup] ✅ Company cleanup successful')
+        } else {
+          console.error('[Signup] ❌ Company cleanup failed:', {
+            status: companyDeleteResponse.status,
+            statusText: companyDeleteResponse.statusText,
+          })
         }
       } catch (cleanupError) {
         console.error('[Signup] ❌ Exception during cleanup:', {
