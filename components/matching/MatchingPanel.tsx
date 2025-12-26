@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Search, FileText, Calendar, User, MapPin, Mic } from 'lucide-react'
+import { Search, FileText, Calendar, User, MapPin, Mic, Edit2, Check, X } from 'lucide-react'
 import Image from 'next/image'
 import MatchingItemPanel from './MatchingItemPanel'
 import { normalizeImageUrl } from '@/lib/utils/image-url'
@@ -74,6 +74,11 @@ export default function MatchingPanel() {
   const [searchQuery, setSearchQuery] = useState('')
   const [countSessions, setCountSessions] = useState<CountSession[]>([])
   const [selectedSessionId, setSelectedSessionId] = useState<string>('all')
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editQuantity, setEditQuantity] = useState<string>('')
+  const [saving, setSaving] = useState(false)
+  const [showNoteModal, setShowNoteModal] = useState(false)
+  const [selectedNoteItem, setSelectedNoteItem] = useState<CountItem | null>(null)
   const supabase = createClient()
   
   // Load count sessions for dropdown
@@ -175,6 +180,7 @@ export default function MatchingPanel() {
           *,
           count_items (
             *,
+            note,
             shelves (
               name,
               corridors (
@@ -451,6 +457,65 @@ export default function MatchingPanel() {
     return item.count_sessions?.users?.full_name || 'Bilinmiyor'
   }
 
+  // Handle note click for matched items
+  const handleNoteClick = (countItem: CountItem) => {
+    if (countItem.note && countItem.note.trim()) {
+      setSelectedNoteItem(countItem)
+      setShowNoteModal(true)
+    } else {
+      alert('Bu ürün için not bulunmamaktadır.')
+    }
+  }
+
+  // Handle quantity update for matched items
+  const handleUpdateQuantity = useCallback(async (countItemId: string) => {
+    const quantity = parseInt(editQuantity, 10)
+    
+    if (isNaN(quantity) || quantity < 0) {
+      alert('Geçerli bir adet giriniz')
+      return
+    }
+
+    try {
+      setSaving(true)
+      const { error } = await supabase
+        .from('count_items')
+        .update({
+          quantity: quantity,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', countItemId)
+
+      if (error) {
+        console.error('Error updating quantity:', error)
+        alert('Adet güncellenirken hata oluştu')
+        return
+      }
+
+      // Reload data to reflect changes
+      await loadData()
+      setEditingItemId(null)
+      setEditQuantity('')
+    } catch (error) {
+      console.error('Error updating quantity:', error)
+      alert('Adet güncellenirken hata oluştu')
+    } finally {
+      setSaving(false)
+    }
+  }, [editQuantity, supabase, loadData])
+
+  // Start editing quantity
+  const handleStartEdit = (match: MatchResult) => {
+    setEditingItemId(match.count_item_id)
+    setEditQuantity(match.count_items.quantity.toString())
+  }
+
+  // Cancel editing
+  const handleCancelEdit = () => {
+    setEditingItemId(null)
+    setEditQuantity('')
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -698,13 +763,55 @@ export default function MatchingPanel() {
                     </div>
                   )}
                   <div className="space-y-2 mb-4">
-                    <p className="font-semibold text-gray-900 text-base">
-                      Adet: {match.count_items.quantity}
-                    </p>
-                    <p className="text-sm text-gray-600">
+                    <div className="flex items-center justify-between">
+                      {editingItemId === match.count_item_id ? (
+                        <div className="flex items-center space-x-2 flex-1">
+                          <label className="text-sm font-semibold text-gray-900 dark:text-white">Adet:</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editQuantity}
+                            onChange={(e) => setEditQuantity(e.target.value)}
+                            className="w-24 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            autoFocus
+                          />
+                          <span className="text-sm text-gray-600 dark:text-gray-400">{match.count_items.quantity_unit}</span>
+                          <button
+                            onClick={() => handleUpdateQuantity(match.count_item_id)}
+                            disabled={saving}
+                            className="p-1.5 bg-green-500 text-white rounded hover:bg-green-600 transition-colors disabled:opacity-50"
+                            title="Kaydet"
+                          >
+                            <Check className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            disabled={saving}
+                            className="p-1.5 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors disabled:opacity-50"
+                            title="İptal"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="font-semibold text-gray-900 dark:text-white text-base">
+                            Adet: {match.count_items.quantity} {match.count_items.quantity_unit}
+                          </p>
+                          <button
+                            onClick={() => handleStartEdit(match)}
+                            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                            title="Adeti düzenle"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                       Raf: {getShelfLocation(match.count_items)}
                     </p>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                       Sayıcı: {getCounterName(match.count_items)}
                     </p>
                   </div>
@@ -716,11 +823,25 @@ export default function MatchingPanel() {
                       <p className="text-sm text-green-700">{match.erp_items.product_name}</p>
                     </div>
                   )}
-                  <div className="flex items-center space-x-3 pt-3 border-t border-gray-100">
-                    <button className="text-gray-500 hover:text-gray-700 transition-colors">
-                      <Mic className="h-5 w-5" />
-                    </button>
-                    <button className="text-gray-500 hover:text-gray-700 transition-colors">
+                  <div className="flex items-center space-x-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                    {match.count_items.audio_url && (
+                      <button 
+                        className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                        title="Ses dosyasını çal"
+                      >
+                        <Mic className="h-5 w-5" />
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => handleNoteClick(match.count_items)}
+                      disabled={!match.count_items.note || !match.count_items.note.trim()}
+                      className={`transition-colors ${
+                        match.count_items.note && match.count_items.note.trim()
+                          ? 'text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300'
+                          : 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
+                      }`}
+                      title={match.count_items.note && match.count_items.note.trim() ? 'Notu göster' : 'Not yok'}
+                    >
                       <FileText className="h-5 w-5" />
                     </button>
                   </div>
@@ -734,6 +855,52 @@ export default function MatchingPanel() {
             </div>
           </div>
         </div>
+
+        {/* Note Modal for Matched Items */}
+        {showNoteModal && selectedNoteItem && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center space-x-2">
+                  <FileText className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Not</h3>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowNoteModal(false)
+                    setSelectedNoteItem(null)
+                  }}
+                  className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="prose max-w-none">
+                  <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                    {selectedNoteItem.note}
+                  </p>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end space-x-2">
+                <button
+                  onClick={() => {
+                    setShowNoteModal(false)
+                    setSelectedNoteItem(null)
+                  }}
+                  className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  Kapat
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
     </div>
   )

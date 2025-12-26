@@ -369,8 +369,10 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
 
   // Handle note modal
   const handleNoteClick = () => {
-    if (match.count_items.note) {
+    if (match.count_items.note && match.count_items.note.trim()) {
       setShowNoteModal(true)
+    } else {
+      alert('Bu ürün için not bulunmamaktadır.')
     }
   }
 
@@ -525,29 +527,39 @@ export default function MatchingItemPanel({ match, onMatched }: MatchingItemPane
                 )}
               </button>
             )}
-            {/* Note Button */}
-            {match.count_items.note && (
-              <button
-                onClick={handleNoteClick}
-                className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-                title="Notu göster"
-              >
-                <FileText className="h-4 w-4" />
-              </button>
-            )}
           </div>
         </div>
-        <p className="text-sm text-gray-600">
-          Raf: {getShelfLocation(match.count_items)}
-        </p>
-        <p className="text-sm text-gray-600">
-          Sayıcı: {getCounterName(match.count_items)}
-        </p>
-        {match.count_items.product_name && (
-          <p className="text-sm text-gray-600">
-            Ürün: {match.count_items.product_name}
-          </p>
-        )}
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+          <div className="space-y-1">
+            <p className="text-sm text-gray-600">
+              Raf: {getShelfLocation(match.count_items)}
+            </p>
+            <p className="text-sm text-gray-600">
+              Sayıcı: {getCounterName(match.count_items)}
+            </p>
+            {match.count_items.product_name && (
+              <p className="text-sm text-gray-600">
+                Ürün: {match.count_items.product_name}
+              </p>
+            )}
+          </div>
+          {/* Note Button - More prominent placement */}
+          <button
+            onClick={handleNoteClick}
+            disabled={!match.count_items.note || !match.count_items.note.trim()}
+            className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+              match.count_items.note && match.count_items.note.trim()
+                ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-300'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50 border border-gray-300'
+            }`}
+            title={match.count_items.note && match.count_items.note.trim() ? 'Notu göster' : 'Not yok'}
+          >
+            <FileText className="h-4 w-4" />
+            <span className="text-xs font-medium">
+              {match.count_items.note && match.count_items.note.trim() ? 'Not' : 'Not Yok'}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* ERP Selection Panel */}
