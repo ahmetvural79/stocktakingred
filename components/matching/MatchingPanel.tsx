@@ -689,10 +689,45 @@ export default function MatchingPanel() {
                     <p className="text-sm text-gray-600 dark:text-gray-300">Sayıcı: {getCounterName(item)}</p>
                   </div>
                   <div className="mt-4 flex items-center space-x-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-                    <button className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
-                      <Mic className="h-5 w-5" />
-                    </button>
-                    <button className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
+                    {/* Audio Button */}
+                    {item.audio_url && (
+                      <button 
+                        className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // Play audio
+                          const audioUrl = normalizeImageUrl(item.audio_url!)
+                          if (audioUrl) {
+                            const audio = new Audio(audioUrl)
+                            audio.play().catch(err => {
+                              console.error('Audio play error:', err)
+                              alert('Ses dosyası çalınamadı')
+                            })
+                          }
+                        }}
+                        title="Ses kaydını dinle"
+                      >
+                        <Mic className="h-5 w-5" />
+                      </button>
+                    )}
+                    {/* Note Button */}
+                    <button 
+                      className={`transition-colors ${
+                        item.note 
+                          ? 'text-blue-500 hover:text-blue-700' 
+                          : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (item.note && item.note.trim()) {
+                          setSelectedNoteItem(item)
+                          setShowNoteModal(true)
+                        } else {
+                          alert('Bu ürün için not bulunmamaktadır.')
+                        }
+                      }}
+                      title={item.note ? 'Notu görüntüle' : 'Not yok'}
+                    >
                       <FileText className="h-5 w-5" />
                     </button>
                   </div>
@@ -828,6 +863,16 @@ export default function MatchingPanel() {
                       <button 
                         className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
                         title="Ses dosyasını çal"
+                        onClick={() => {
+                          const audioUrl = normalizeImageUrl(match.count_items.audio_url!)
+                          if (audioUrl) {
+                            const audio = new Audio(audioUrl)
+                            audio.play().catch(err => {
+                              console.error('Audio play error:', err)
+                              alert('Ses dosyası çalınamadı')
+                            })
+                          }
+                        }}
                       >
                         <Mic className="h-5 w-5" />
                       </button>
