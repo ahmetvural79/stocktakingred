@@ -113,6 +113,8 @@ export default function CountSessionDetail({ sessionId }: CountSessionDetailProp
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [filterStatus, setFilterStatus] = useState<'all' | 'matched' | 'pending'>('all')
+  const [filterHasNoteOrPhoto, setFilterHasNoteOrPhoto] = useState(false)
+  const [viewingNote, setViewingNote] = useState<CountItemData | null>(null)
   
   // Edit mode state
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
@@ -462,6 +464,14 @@ export default function CountSessionDetail({ sessionId }: CountSessionDetailProp
       items = items.filter(item => !matchedIds.has(item.id))
     }
     
+    // Apply "has note or photo" filter
+    if (filterHasNoteOrPhoto) {
+      items = items.filter(item => 
+        (item.note && item.note.trim().length > 0) || 
+        (item.photo_url && item.photo_url.trim().length > 0)
+      )
+    }
+    
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
@@ -471,16 +481,18 @@ export default function CountSessionDetail({ sessionId }: CountSessionDetailProp
         const shelfName = item.shelves?.name?.toLowerCase() || ''
         const erpCode = match?.erp_items?.product_code?.toLowerCase() || ''
         const erpName = match?.erp_items?.product_name?.toLowerCase() || ''
+        const noteContent = item.note?.toLowerCase() || ''
         
         return productName.includes(query) || 
                shelfName.includes(query) || 
                erpCode.includes(query) ||
-               erpName.includes(query)
+               erpName.includes(query) ||
+               noteContent.includes(query)
       })
     }
     
     return items
-  }, [allItems, matchedItems, filterStatus, searchQuery])
+  }, [allItems, matchedItems, filterStatus, filterHasNoteOrPhoto, searchQuery])
 
   // Pagination
   const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE)
@@ -492,7 +504,15 @@ export default function CountSessionDetail({ sessionId }: CountSessionDetailProp
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery, filterStatus])
+  }, [searchQuery, filterStatus, filterHasNoteOrPhoto])
+  
+  // Count items with notes or photos
+  const itemsWithNoteOrPhoto = useMemo(() => {
+    return allItems.filter(item => 
+      (item.note && item.note.trim().length > 0) || 
+      (item.photo_url && item.photo_url.trim().length > 0)
+    ).length
+  }, [allItems])
 
   // Start editing an item
   const startEditing = (itemId: string) => {
@@ -900,6 +920,18 @@ export default function CountSessionDetail({ sessionId }: CountSessionDetailProp
           >
             Bekleyen ({allItems.length - matchedItems.length})
           </button>
+          <div className="h-6 border-l border-gray-300 dark:border-gray-600 mx-2"></div>
+          <button
+            onClick={() => setFilterHasNoteOrPhoto(!filterHasNoteOrPhoto)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+              filterHasNoteOrPhoto
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            <FileText className="h-4 w-4" />
+            Not/Fotoğraf ({itemsWithNoteOrPhoto})
+          </button>
         </div>
       </div>
 
@@ -920,6 +952,7 @@ export default function CountSessionDetail({ sessionId }: CountSessionDetailProp
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Fotoğraf</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ürün / Raf</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Not</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Sayım</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">ERP Kodu</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">ERP Stok</th>
@@ -931,7 +964,7 @@ export default function CountSessionDetail({ sessionId }: CountSessionDetailProp
             <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
               {paginatedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center">
+                  <td colSpan={9} className="px-4 py-12 text-center">
                     <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-500">Ürün bulunamadı</p>
                   </td>
@@ -969,12 +1002,20 @@ export default function CountSessionDetail({ sessionId }: CountSessionDetailProp
                           <p className="text-sm text-gray-500 dark:text-gray-400">
                             Raf: {item.shelves?.name || 'Bilinmiyor'}
                           </p>
-                          {item.note && (
-                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate max-w-[200px]">
-                              Not: {item.note}
-                            </p>
-                          )}
                         </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {item.note && item.note.trim() ? (
+                          <button
+                            onClick={() => setViewingNote(item)}
+                            className="max-w-[200px] text-left text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline underline-offset-2 truncate block"
+                            title={item.note}
+                          >
+                            {item.note.length > 30 ? `${item.note.substring(0, 30)}...` : item.note}
+                          </button>
+                        ) : (
+                          <span className="text-gray-400 text-sm">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {isEditing ? (
@@ -1145,6 +1186,76 @@ export default function CountSessionDetail({ sessionId }: CountSessionDetailProp
           </div>
         )}
       </div>
+
+      {/* Note View Modal */}
+      {viewingNote && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center space-x-3">
+                <FileText className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Ürün Notu</h3>
+              </div>
+              <button
+                onClick={() => setViewingNote(null)}
+                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* Product Info */}
+              <div className="flex items-start gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                {viewingNote.photo_url && normalizeImageUrl(viewingNote.photo_url) && (
+                  <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                    <Image
+                      src={normalizeImageUrl(viewingNote.photo_url)!}
+                      alt={viewingNote.product_name || 'Ürün'}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900 dark:text-white text-lg">
+                    {viewingNote.product_name || 'İsimsiz Ürün'}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    Raf: {viewingNote.shelves?.name || 'Bilinmiyor'}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Miktar: {viewingNote.quantity} {viewingNote.quantity_unit}
+                  </p>
+                </div>
+              </div>
+
+              {/* Note Content */}
+              <div className="prose max-w-none">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Not İçeriği:</h4>
+                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
+                  <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
+                    {viewingNote.note || 'Not bulunmuyor'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end space-x-2">
+              <button
+                onClick={() => setViewingNote(null)}
+                className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                Kapat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

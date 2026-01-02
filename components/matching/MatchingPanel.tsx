@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Search, FileText, Calendar, User, MapPin, Mic, Edit2, Check, X } from 'lucide-react'
 import Image from 'next/image'
@@ -79,6 +79,7 @@ export default function MatchingPanel() {
   const [saving, setSaving] = useState(false)
   const [showNoteModal, setShowNoteModal] = useState(false)
   const [selectedNoteItem, setSelectedNoteItem] = useState<CountItem | null>(null)
+  const [filterHasNoteOrPhoto, setFilterHasNoteOrPhoto] = useState(false)
   const supabase = createClient()
   
   // Load count sessions for dropdown
@@ -467,6 +468,23 @@ export default function MatchingPanel() {
     }
   }
 
+  // Filter pending items by note/photo
+  const filteredPendingItems = useMemo(() => {
+    if (!filterHasNoteOrPhoto) return pendingItems
+    return pendingItems.filter(item => 
+      (item.note && item.note.trim().length > 0) || 
+      (item.photo_url && item.photo_url.trim().length > 0)
+    )
+  }, [pendingItems, filterHasNoteOrPhoto])
+
+  // Count items with notes or photos
+  const itemsWithNoteOrPhotoCount = useMemo(() => {
+    return pendingItems.filter(item => 
+      (item.note && item.note.trim().length > 0) || 
+      (item.photo_url && item.photo_url.trim().length > 0)
+    ).length
+  }, [pendingItems])
+
   // Handle quantity update for matched items
   const handleUpdateQuantity = useCallback(async (countItemId: string) => {
     const quantity = parseInt(editQuantity, 10)
@@ -567,7 +585,7 @@ export default function MatchingPanel() {
       </div>
 
         {/* Filters */}
-        <div className="mb-8 flex space-x-4">
+        <div className="mb-8 flex space-x-4 flex-wrap gap-2">
           <button className="flex items-center space-x-2 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
             <Calendar className="h-5 w-5 text-gray-600" />
             <span className="text-gray-700 font-medium">Tarihe Göre</span>
@@ -580,6 +598,19 @@ export default function MatchingPanel() {
             <MapPin className="h-5 w-5 text-gray-600" />
             <span className="text-gray-700 font-medium">Rafa Göre</span>
           </button>
+          <button 
+            onClick={() => setFilterHasNoteOrPhoto(!filterHasNoteOrPhoto)}
+            className={`flex items-center space-x-2 px-4 py-2.5 border rounded-lg transition-colors ${
+              filterHasNoteOrPhoto 
+                ? 'bg-purple-600 text-white border-purple-600' 
+                : 'border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <FileText className={`h-5 w-5 ${filterHasNoteOrPhoto ? 'text-white' : 'text-gray-600'}`} />
+            <span className={`font-medium ${filterHasNoteOrPhoto ? 'text-white' : 'text-gray-700'}`}>
+              Not/Fotoğraf İçerenler ({itemsWithNoteOrPhotoCount})
+            </span>
+          </button>
         </div>
 
         {/* Columns */}
@@ -589,11 +620,11 @@ export default function MatchingPanel() {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">Eşleştirme Bekleyenler</h3>
               <span className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-3 py-1 rounded-full text-sm font-semibold">
-                {pendingItems.length}
+                {filteredPendingItems.length}{filterHasNoteOrPhoto ? ` / ${pendingItems.length}` : ''}
               </span>
             </div>
             <div className="space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto">
-              {pendingItems.map((item, index) => (
+              {filteredPendingItems.map((item, index) => (
                 <div
                   key={item.id}
                   className={`bg-white dark:bg-gray-800 border rounded-xl p-4 transition-all ${
@@ -606,7 +637,8 @@ export default function MatchingPanel() {
                     e.stopPropagation()
                     
                     // FIFO mantığı: Sadece ilk sıradaki (en eski) item eşleştirme paneline geçebilir
-                    const isFirstItem = pendingItems.length > 0 && pendingItems[0].id === item.id
+                    // Filtre aktifse, filtrelenmiş liste içindeki ilk item seçilebilir
+                    const isFirstItem = filteredPendingItems.length > 0 && filteredPendingItems[0].id === item.id
                     if (!isFirstItem) {
                       // Kullanıcıya bilgi ver
                       alert('Lütfen sıradaki ilk ürünü eşleştirin. FIFO (İlk Gelen İlk Çıkar) mantığı ile çalışıyoruz.')
@@ -733,9 +765,9 @@ export default function MatchingPanel() {
                   </div>
                 </div>
               ))}
-              {pendingItems.length === 0 && (
+              {filteredPendingItems.length === 0 && (
                 <div className="text-center py-12 text-gray-400 dark:text-gray-500">
-                  <p>Eşleştirme bekleyen ürün yok</p>
+                  <p>{filterHasNoteOrPhoto ? 'Not veya fotoğraf içeren ürün yok' : 'Eşleştirme bekleyen ürün yok'}</p>
                 </div>
               )}
             </div>
