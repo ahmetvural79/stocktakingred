@@ -42,32 +42,32 @@ export default function LoginPage() {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-600">Yükleniyor...</div>
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900">
+        <div className="text-black dark:text-white">Yükleniyor...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900">
+      <div className="max-w-md w-full space-y-8 p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-100 dark:border-gray-700">
         <div>
           <h1 className="text-3xl font-bold text-center">
-            <span className="text-red-600">the</span>
-            <span className="text-black">Stocktaking</span>
-            <span className="text-red-600"> Red</span>
+            <span className="text-red-600 dark:text-red-400">the</span>
+            <span className="text-black dark:text-white">Stocktaking</span>
+            <span className="text-red-600 dark:text-red-400"> Red</span>
           </h1>
-          <p className="mt-2 text-center text-gray-600">Depo Sayım Sistemi</p>
+          <p className="mt-2 text-center text-black dark:text-white">Depo Sayım Sistemi</p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            <div className="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded">
               {error}
             </div>
           )}
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-black dark:text-white">
                 E-posta
               </label>
               <input
@@ -77,11 +77,11 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-black dark:text-white focus:outline-none focus:ring-red-500 focus:border-red-500"
               />
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium text-black dark:text-white">
                 Şifre
               </label>
               <input
@@ -91,7 +91,7 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-black dark:text-white focus:outline-none focus:ring-red-500 focus:border-red-500"
               />
             </div>
           </div>
@@ -107,9 +107,9 @@ export default function LoginPage() {
         </form>
 
         <div className="text-center">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-black dark:text-white">
             Hesabınız yok mu?{' '}
-            <Link href="/signup" className="font-medium text-red-600 hover:text-red-500">
+            <Link href="/signup" className="font-medium text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300">
               Firma Kaydı Oluşturun
             </Link>
           </p>
