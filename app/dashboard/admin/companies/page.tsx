@@ -1,7 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import DashboardLayout from '@/components/layout/DashboardLayout'
-import { Building2, Users, Warehouse, FileText, Package, TrendingUp, BarChart2 } from 'lucide-react'
+import { Building2, Users, Warehouse, FileText, Package, TrendingUp, BarChart2, ChevronLeft, ChevronRight } from 'lucide-react'
+import Link from 'next/link'
+import CompanyDetailButton from '@/components/admin/CompanyDetailButton'
+import CompanySearchForm from '@/components/admin/CompanySearchForm'
 
 type CompanyWithStats = {
   id: string
@@ -13,7 +16,11 @@ type CompanyWithStats = {
   erp_imports?: Array<{ count: number }>
 }
 
-export default async function CompanyManagementPage() {
+interface PageProps {
+  searchParams: Promise<{ page?: string; search?: string }>
+}
+
+export default async function CompanyManagementPage({ searchParams }: PageProps) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -33,6 +40,30 @@ export default async function CompanyManagementPage() {
     redirect('/dashboard')
   }
 
+  // Pagination - searchParams'ı await ile aç
+  const params = await searchParams
+  const page = parseInt(params.page || '1', 10)
+  const searchQuery = params.search || ''
+  const itemsPerPage = 20
+  const offset = (page - 1) * itemsPerPage
+
+  // Build query with search filter
+  let companiesQuery = supabase
+    .from('companies')
+    .select('id, name, created_at, users(count), warehouses(count), count_sessions(count), erp_imports(count)')
+    .order('created_at', { ascending: false })
+
+  // Apply search filter if provided
+  if (searchQuery.trim()) {
+    companiesQuery = companiesQuery.ilike('name', `%${searchQuery.trim()}%`)
+  }
+
+  // Get total count with search filter
+  let totalCompaniesQuery = supabase.from('companies').select('*', { count: 'exact', head: true })
+  if (searchQuery.trim()) {
+    totalCompaniesQuery = totalCompaniesQuery.ilike('name', `%${searchQuery.trim()}%`)
+  }
+
   const [
     totalCompaniesResponse,
     totalUsersResponse,
@@ -41,16 +72,12 @@ export default async function CompanyManagementPage() {
     totalImportsResponse,
     companiesResponse,
   ] = await Promise.all([
-    supabase.from('companies').select('*', { count: 'exact', head: true }),
+    totalCompaniesQuery,
     supabase.from('users').select('*', { count: 'exact', head: true }),
     supabase.from('warehouses').select('*', { count: 'exact', head: true }),
     supabase.from('count_sessions').select('*', { count: 'exact', head: true }),
     supabase.from('erp_imports').select('*', { count: 'exact', head: true }),
-    supabase
-      .from('companies')
-      .select('id, name, created_at, users(count), warehouses(count), count_sessions(count), erp_imports(count)')
-      .order('created_at', { ascending: false })
-      .limit(50),
+    companiesQuery.range(offset, offset + itemsPerPage - 1),
   ])
 
   const totalCompanies = totalCompaniesResponse.count ?? 0
@@ -62,6 +89,11 @@ export default async function CompanyManagementPage() {
   const companies = (companiesResponse.data ?? []) as CompanyWithStats[]
 
   const getCount = (arr?: Array<{ count: number }>) => (arr && arr.length > 0 ? arr[0].count : 0)
+
+  // Calculate pagination
+  const totalPages = Math.ceil(totalCompanies / itemsPerPage)
+  const hasNextPage = page < totalPages
+  const hasPrevPage = page > 1
 
   return (
     <DashboardLayout userName={currentUser.full_name || user.email} userRole={currentUser.role}>
@@ -128,15 +160,30 @@ export default async function CompanyManagementPage() {
 
         {/* Company table */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Firmalar</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300">Sistemde kayıtlı en son 50 firma listelenir.</p>
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Firmalar</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  {searchQuery ? (
+                    <>
+                      &quot;{searchQuery}&quot; için {totalCompanies} sonuç • Sayfa {page} / {totalPages}
+                    </>
+                  ) : (
+                    <>
+                      Sayfa {page} / {totalPages} • Toplam {totalCompanies} firma
+                    </>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center space-x-3 text-sm text-gray-600 dark:text-gray-300">
+                <TrendingUp className="h-4 w-4 text-green-500 dark:text-green-400" />
+                <span>Aktif şirket izleme</span>
+              </div>
             </div>
-            <div className="flex items-center space-x-3 text-sm text-gray-600 dark:text-gray-300">
-              <TrendingUp className="h-4 w-4 text-green-500 dark:text-green-400" />
-              <span>Aktif şirket izleme</span>
-            </div>
+            
+            {/* Search Form */}
+            <CompanySearchForm initialSearch={searchQuery} />
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -160,12 +207,15 @@ export default async function CompanyManagementPage() {
                   <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
                     Oluşturulma
                   </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
+                    İşlemler
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {companies.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-10 text-center text-sm text-gray-600 dark:text-gray-300">
+                    <td colSpan={7} className="px-6 py-10 text-center text-sm text-gray-600 dark:text-gray-300">
                       Henüz firma bulunmuyor.
                     </td>
                   </tr>
@@ -204,12 +254,79 @@ export default async function CompanyManagementPage() {
                           day: 'numeric',
                         })}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <CompanyDetailButton companyId={company.id} companyName={company.name} />
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
           </div>
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <div className="text-sm text-gray-700 dark:text-gray-300">
+                {offset + 1} - {Math.min(offset + itemsPerPage, totalCompanies)} / {totalCompanies} firma gösteriliyor
+              </div>
+              <div className="flex items-center space-x-2">
+                <Link
+                  href={`/dashboard/admin/companies${hasPrevPage ? `?page=${page - 1}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}` : searchQuery ? `?search=${encodeURIComponent(searchQuery)}` : ''}`}
+                  className={`px-4 py-2 rounded-lg border ${
+                    hasPrevPage
+                      ? 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                  }`}
+                  aria-disabled={!hasPrevPage}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Link>
+                
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum: number
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (page <= 3) {
+                      pageNum = i + 1
+                    } else if (page >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = page - 2 + i
+                    }
+                    
+                    const searchParam = searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''
+                    return (
+                      <Link
+                        key={pageNum}
+                        href={`/dashboard/admin/companies?page=${pageNum}${searchParam}`}
+                        className={`px-3 py-2 rounded-lg text-sm ${
+                          pageNum === page
+                            ? 'bg-red-600 text-white'
+                            : 'bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {pageNum}
+                      </Link>
+                    )
+                  })}
+                </div>
+                
+                <Link
+                  href={`/dashboard/admin/companies?page=${page + 1}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`}
+                  className={`px-4 py-2 rounded-lg border ${
+                    hasNextPage
+                      ? 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                  }`}
+                  aria-disabled={!hasNextPage}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Analytics summary */}
