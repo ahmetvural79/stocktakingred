@@ -96,3 +96,97 @@ export function exportCountItemsToExcel(
   XLSX.writeFile(wb, filename)
 }
 
+interface CompanyExportData {
+  id: string
+  name: string
+  created_at: string
+  users_count: number
+  warehouses_count: number
+  count_sessions_count: number
+  erp_imports_count: number
+  users?: Array<{
+    id: string
+    email: string | null
+    full_name: string | null
+    role: string
+    created_at: string
+  }>
+}
+
+export function exportCompaniesToExcel(
+  companies: CompanyExportData[],
+  filename: string = 'firma-analizi.xlsx'
+) {
+  // Ana firma verileri
+  const companyData = companies.map((company) => ({
+    'Firma ID': company.id,
+    'Firma Adı': company.name,
+    'Kullanıcı Sayısı': company.users_count,
+    'Depo Sayısı': company.warehouses_count,
+    'Sayım Listesi Sayısı': company.count_sessions_count,
+    'ERP Import Sayısı': company.erp_imports_count,
+    'Oluşturulma Tarihi': new Date(company.created_at).toLocaleDateString('tr-TR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }),
+  }))
+
+  // Kullanıcı detayları (her firma için)
+  const usersData: Array<{
+    'Firma Adı': string
+    'Kullanıcı Adı': string
+    'E-posta': string
+    'Rol': string
+    'Oluşturulma Tarihi': string
+  }> = []
+
+  companies.forEach((company) => {
+    if (company.users && company.users.length > 0) {
+      company.users.forEach((user) => {
+        usersData.push({
+          'Firma Adı': company.name,
+          'Kullanıcı Adı': user.full_name || 'İsimsiz',
+          'E-posta': user.email || '-',
+          'Rol': user.role === 'main_admin' ? 'Ana Admin' : 
+                 user.role === 'admin' ? 'Admin' :
+                 user.role === 'manager' ? 'Yönetici' : 'Kullanıcı',
+          'Oluşturulma Tarihi': new Date(user.created_at).toLocaleDateString('tr-TR'),
+        })
+      })
+    }
+  })
+
+  // Workbook oluştur
+  const wb = XLSX.utils.book_new()
+
+  // Firma özeti sayfası
+  const wsCompanies = XLSX.utils.json_to_sheet(companyData)
+  wsCompanies['!cols'] = [
+    { wch: 36 }, // Firma ID
+    { wch: 30 }, // Firma Adı
+    { wch: 15 }, // Kullanıcı Sayısı
+    { wch: 15 }, // Depo Sayısı
+    { wch: 18 }, // Sayım Listesi Sayısı
+    { wch: 18 }, // ERP Import Sayısı
+    { wch: 20 }, // Oluşturulma Tarihi
+  ]
+  XLSX.utils.book_append_sheet(wb, wsCompanies, 'Firma Özeti')
+
+  // Kullanıcı detayları sayfası (eğer varsa)
+  if (usersData.length > 0) {
+    const wsUsers = XLSX.utils.json_to_sheet(usersData)
+    wsUsers['!cols'] = [
+      { wch: 30 }, // Firma Adı
+      { wch: 25 }, // Kullanıcı Adı
+      { wch: 30 }, // E-posta
+      { wch: 15 }, // Rol
+      { wch: 20 }, // Oluşturulma Tarihi
+    ]
+    XLSX.utils.book_append_sheet(wb, wsUsers, 'Kullanıcı Detayları')
+  }
+
+  // Dosyayı indir
+  XLSX.writeFile(wb, filename)
+}
+

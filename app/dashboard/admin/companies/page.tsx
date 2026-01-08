@@ -5,6 +5,7 @@ import { Building2, Users, Warehouse, FileText, Package, TrendingUp, BarChart2, 
 import Link from 'next/link'
 import CompanyDetailButton from '@/components/admin/CompanyDetailButton'
 import CompanySearchForm from '@/components/admin/CompanySearchForm'
+import CompanyExportButton from '@/components/admin/CompanyExportButton'
 
 type CompanyWithStats = {
   id: string
@@ -99,10 +100,15 @@ export default async function CompanyManagementPage({ searchParams }: PageProps)
     <DashboardLayout userName={currentUser.full_name || user.email} userRole={currentUser.role}>
       <div className="p-6 bg-white dark:bg-gray-900 min-h-screen">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Firma Yönetimi</h2>
-          <p className="mt-2 text-gray-700 dark:text-gray-300">
-            Sistem genelindeki tüm firmaları, kullanıcılarını ve aktivitelerini izleyin.
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Firma Yönetimi</h2>
+              <p className="mt-2 text-gray-700 dark:text-gray-300">
+                Sistem genelindeki tüm firmaları, kullanıcılarını ve aktivitelerini izleyin.
+              </p>
+            </div>
+            <CompanyExportButton />
+          </div>
         </div>
 
         {/* Global Stats */}

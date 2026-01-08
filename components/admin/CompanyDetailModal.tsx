@@ -232,3 +232,6 @@ export default function CompanyDetailModal({ companyId, companyName, onClose }: 
   )
 }
 
+
+
+
